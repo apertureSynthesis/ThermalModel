@@ -51,9 +51,11 @@ class preProcessing(object):
 
         self.parFile = parFile
 
-    def _getPars(self):
-        #Read in content from the input parameter file 
-        #and store them in a dictionary for later use
+    def getPars(self):
+        """
+        Read in content from the input parameter file 
+        and store them in a dictionary for later use
+        """
 
         self.pars = {}
         with open(self.parFile, 'r') as f:
@@ -66,7 +68,7 @@ class preProcessing(object):
                         val = val.replace('"','')
                         self.pars[var.strip()] = val.strip()
 
-    def _reCast(self):
+    def reCast(self):
 
 
         #Check for the input file and output directories.
@@ -141,14 +143,110 @@ class preProcessing(object):
                 hdu3 = fits.ImageHDU(lat.to_value('deg'), name='lat')
                 hdu3.header['bunit'] = 'deg'
 
-                outFile = self.pars['reCastPath']+'/temp_gamma_{:.0f}_emiss_{:.2f}.fits'.format(t.value, e)
+                outFile = self.pars['reCastPath']+f'/temp_gamma_{t.value:.0f}_emiss_{e:.2f}.fits'
                 fits.HDUList([hdu0, hdu1, hdu2, hdu3]).writeto(outFile, overwrite=True)
 
+    def makePlots(self):
+        """
+        Make sample plots and display headers if requested
+        """
 
-        
+        if self.displayHeader:
+            print('KRC File Header Information:\n')
+            print(self.pars['krcFile'].info())
+
+        if self.withPlots:
+
+            """
+            Plot of depths sampled by each thermal inertia value
+            """
+            #Load the depth data
+            with fits.open(self.pars['krcFile']) as f:
+                TIs = np.squeeze(f[3].data)    #Thermal Inertia
+                emis  = np.squeeze(f[4].data)  #Emissivity
+                depths = np.squeeze(f[5].data) #Depths
+                
+
+            fig = plt.figure(figsize=(15,15), dpi=200)
+
+            for i in range(depths.shape[1]):
+                plt.plot(np.arange(depths.shape[0]),depths[:,i],label=f"TI={TIs[i]:.0f}")
+            plt.ylabel('Depth (m)')
+            plt.xlabel('Index')
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(os.getcwd()+'/TI-Depth.pdf')
+            plt.show()
+
+            """
+            Plots of (1) Surface temperature vs. LST: how surface temperature varies with TI through a diurnal cycle
+            (2) Temperature vs. Depth: how temperature propagates into the subsurface at different times
+            """
+            tfiles = [fits.open(f) for f in [self.pars['reCastPath']+f'/temp_gamma_{t:.0f}_emiss_0.90.fits' for t in TIs]]
+
+            fig, axs = plt.subplots(figsize=(15,30), dpi=200)
+            axs = axs.ravel()
+            for tfile in tfiles:
+                axs[0].plot(tfile[0].data[9, 0]) #latitude index 9 (near equator), depth = 0 (surface)
+                axs[0].set_xlabel('LST index (per 0.5 hours from noon)')
+                axs[0].set_ylabel('T (K)')
+                axs[0].legend([f'TI={ti:.0f}' for ti in TIs])
+
+            for hour in range(0, 48, 8):
+                axs[1].plot(tfile[0].data[9, :, hour])
+                axs[1].set_xlabel('Depth (Index)')
+                axs[1].set_ylabel('T (K)')
+                axs[1].legend([f'TI={ti:.0f}' for ti in TIs])
+
+            plt.tight_layout()
+            plt.savefig(os.getcwd()+'/Temperature-Plots.pdf')
+            plt.show()
+
+            """
+            Plot of temperature vs. time and depth for the first combination of TI and emissivity
+            """
+            modelFile = self.pars['reCastPath']+f'/temp_gamma_{TIs[0]:.0f}_emiss_{emis[0]:.2f}.fits'
+            with fits.open(modelFile) as f:
+                temp  = f[0].data  #Temperature
+                lst   = f['lst'].data #Local solar times (48 points in hours)
+                depth = f['depth'].data #Depths (100 points, in meters)
+                lat   = f['lat.data'] #Latitudes (19 pionts, in degrees)
+
+            #Select a latitude to visualize (index 9 = equator)
+            ilat = 9
+            z = temp[ilat, :, :].T #Slice and transpose to shape (time, depth)
+
+            #Create a meshgrid for plotting time vs. depth
+            #The meshgrid must match the shape of z: (48 times steps x 100 depth points)
+            LST, DEPTH = np.meshgrid(lst, depth, indexing='ij')
+
+            #Create the 3D plot
+            fig, ax = plt.subplots(figsize=(15,15), projection='3d', dpi=200)
+            
+            surf = ax.plot_surface(LST, DEPTH, z, cmap='inferno')
+            ax.set_xlabel('Local Solar Time (hours)')
+            ax.set_ylabel('Depth (m)')
+            ax.set_zlabel('Temperature (K)')
+            ax.set_title(f"Temperature vs. Time and Depth\nTI={TIs[0]:.0f}, Emissivity={emis[0]:.2f}, Latitude={lat[ilat]:.0f} deg")
+
+            #Add colorbar
+            fig.colorbar(surf, label='Temperature (K)')
+
+            plt.tight_layout()
+            plt.savefig(os.getcwd()+'/Temperature-Depth-Time.pdf')
+            plt.show()
+
+            """
+            Plot of Temperature vs LST and Depth (2D)
+            """
+            
+
+            
+
     def __call__(self):
-        self._getPars()
-        self._reCast()
+        self.getPars()
+        self.reCast()
 
 
 
