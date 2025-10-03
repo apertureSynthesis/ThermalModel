@@ -3,6 +3,9 @@ sys.path.append(os.environ['HOME']+'/scripts')
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import colormaps
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
 
 from astropy.io import ascii
 from astropy.io import fits
@@ -150,12 +153,13 @@ class preProcessing(object):
         """
         Make sample plots and display headers if requested
         """
-
-        if self.displayHeader:
+        if self.pars['displayHeader']:
             print('KRC File Header Information:\n')
-            print(self.pars['krcFile'].info())
+            with fits.open(self.pars['krcFile']) as f:
+                krcInfo = f.info()
+            print(krcInfo)
 
-        if self.withPlots:
+        if self.pars['withPlots']:
 
             """
             Plot of depths sampled by each thermal inertia value
@@ -167,13 +171,14 @@ class preProcessing(object):
                 depths = np.squeeze(f[5].data) #Depths
                 
 
-            fig = plt.figure(figsize=(15,15), dpi=200)
+            fig, ax = plt.subplots(figsize=(6,6), dpi=200)
 
             for i in range(depths.shape[1]):
-                plt.plot(np.arange(depths.shape[0]),depths[:,i],label=f"TI={TIs[i]:.0f}")
-            plt.ylabel('Depth (m)')
-            plt.xlabel('Index')
-            plt.legend()
+                ax.plot(np.arange(depths.shape[0]),depths[:,i],label=f"TI={TIs[i]:.0f}")
+            ax.set_ylabel('Depth (m)')
+            ax.set_xlabel('Index')
+            ax.set_title('Depths Probed by Each Thermal Inertia Value')
+            ax.legend()
             plt.grid(True)
             plt.tight_layout()
             plt.savefig(os.getcwd()+'/TI-Depth.pdf')
@@ -185,19 +190,21 @@ class preProcessing(object):
             """
             tfiles = [fits.open(f) for f in [self.pars['reCastPath']+f'/temp_gamma_{t:.0f}_emiss_0.90.fits' for t in TIs]]
 
-            fig, axs = plt.subplots(figsize=(15,30), dpi=200)
+            fig, axs = plt.subplots(2, 1, figsize=(10,20), dpi=200)
             axs = axs.ravel()
             for tfile in tfiles:
                 axs[0].plot(tfile[0].data[9, 0]) #latitude index 9 (near equator), depth = 0 (surface)
                 axs[0].set_xlabel('LST index (per 0.5 hours from noon)')
-                axs[0].set_ylabel('T (K)')
+                axs[0].set_ylabel('Temperature (K)')
                 axs[0].legend([f'TI={ti:.0f}' for ti in TIs])
+            axs[0].set_title('Surface Temperature vs. Local Solar Time')
 
             for hour in range(0, 48, 8):
-                axs[1].plot(tfile[0].data[9, :, hour])
+                axs[1].plot(tfile[0].data[9, :, hour],label=f't={hour:d} hrs.')
                 axs[1].set_xlabel('Depth (Index)')
-                axs[1].set_ylabel('T (K)')
-                axs[1].legend([f'TI={ti:.0f}' for ti in TIs])
+                axs[1].set_ylabel('Temperature (K)')
+            axs[1].legend()
+            axs[1].set_title(f'Temperature vs. Depth vs. Time\n(TI={TIs[0]:.0f}, Emissivity=90)')
 
             plt.tight_layout()
             plt.savefig(os.getcwd()+'/Temperature-Plots.pdf')
@@ -211,7 +218,7 @@ class preProcessing(object):
                 temp  = f[0].data  #Temperature
                 lst   = f['lst'].data #Local solar times (48 points in hours)
                 depth = f['depth'].data #Depths (100 points, in meters)
-                lat   = f['lat.data'] #Latitudes (19 pionts, in degrees)
+                lat   = f['lat'].data #Latitudes (19 pionts, in degrees)
 
             #Select a latitude to visualize (index 9 = equator)
             ilat = 9
@@ -222,7 +229,7 @@ class preProcessing(object):
             LST, DEPTH = np.meshgrid(lst, depth, indexing='ij')
 
             #Create the 3D plot
-            fig, ax = plt.subplots(figsize=(15,15), projection='3d', dpi=200)
+            fig, ax = plt.subplots(figsize=(6,6), dpi=200, subplot_kw=dict(projection='3d'))
             
             surf = ax.plot_surface(LST, DEPTH, z, cmap='inferno')
             ax.set_xlabel('Local Solar Time (hours)')
@@ -240,13 +247,54 @@ class preProcessing(object):
             """
             Plot of Temperature vs LST and Depth (2D)
             """
-            
+            plotDepths = depth[0::10] #Pick out 0m and every 10 depths thereafter
+            cmap = colormaps['inferno']
+            norm = Normalize(vmin = min(plotDepths), vmax = max(plotDepths))
+            colors = [cmap(norm(d)) for d in plotDepths]
 
-            
+            fig, ax = plt.subplots(figsize=(6,6), dpi=200)
+
+            for plotDepth, color in zip(plotDepths, colors):
+                idepth = np.argmin(np.abs(depth-plotDepth))
+                temperature = temp[ilat, idepth, :]
+                ax.scatter(lst, temperature, color=color, marker='o', 
+                           label=f"{plotDepth} m")
+                
+            ax.set_xlabel('Local Solar Time (hours)')
+            ax.set_ylabel('Temperature (K)')
+            ax.set_title(f'Temperature vs. LST\nTI={TIs[0]:.0f}, Emissivity={emis[0]:.2f}, Latitude={lat[ilat]:.0f} deg')
+            ax.grid(True)
+
+            sm = ScalarMappable(norm=norm, cmap=cmap)
+            sm.set_array([])
+            fig.colorbar(sm, ax=ax, label='Depth (m)')
+
+            plt.tight_layout()
+            plt.savefig(os.getcwd()+'/Temperature-Depth-LST.pdf')
+            plt.show()
+
+            """
+            Plot surface temperature vs LST for a variety of latitudes
+            """
+            lats = lat[0::3]
+
+            fig, ax = plt.subplots(figsize=(6,6), dpi=200)
+            for l in lats:
+                ilat = np.argmin(np.abs(lat-l))
+                ax.plot(tfile[0].data[ilat, 0, :]) #temp[lat, depth=0, time]
+            ax.legend([f'l={i:.0f}' for i in lats])
+            ax.set_xlabel('LST Index (per 0.5 hours from noon)')
+            ax.set_ylabel('Temperature (K)')
+            ax.set_title(f"Surface Temperature vs. Local Solar Time vs. Latitude\n(TI={TIs[0]:.0f}, Emissivity={emis[0]:.2f})")
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(os.getcwd()+'/Temperature-LST-Latitude.pdf')
+            plt.show()
 
     def __call__(self):
         self.getPars()
         self.reCast()
+        self.makePlots()
 
 
 
