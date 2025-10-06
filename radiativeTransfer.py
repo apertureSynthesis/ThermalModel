@@ -2,7 +2,7 @@ import os,sys
 sys.path.append(os.environ['HOME']+'/scripts')
 
 from ThermalModel.utils.core import Layer, Surface
-from ThermalModel.utils.helper import getPars
+from ThermalModel.utils.helpers import getPars
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,10 +10,11 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 import astropy.units as u
 
-from astropy.modelng.physical_models import Blackbody
-import time
+from astropy.modeling.physical_models import BlackBody
 
-class RadiativeTransfer(object):
+from glob import glob
+
+class radiativeTransfer(object):
 
     """
     Class for applying radiative transfer models to a set of simulated thermal maps for an asteroid.
@@ -56,12 +57,12 @@ class RadiativeTransfer(object):
 
 
     def __init__(self,parFile):
+        super().__init__()
 
         self.parFile = parFile
         self.pars = getPars(parFile)
 
     def getRadiativeTransfer(self):
-
         #Check for the input file and output directories.
         if not os.path.exists(self.pars['tempMapPath']):
             raise ValueError('Temperature maps directory not found')
@@ -70,8 +71,8 @@ class RadiativeTransfer(object):
             os.makedirs(self.pars['radiativePath'])
 
         #Define the ranges of index of refraction (nn) and loss tangent (loss_tan) to iterate over
-        nn = np.linspace(self.pars['nn'][0], self.pars['nn'][1], self.pars['nn'][2])
-        loss_tan = np.logspace(self.pars['loss'][0], self.pars['loss'][1], self.pars['loss'][2])
+        nn = np.linspace(self.pars['nn'][0], self.pars['nn'][1], np.int64(self.pars['nn'][2]))
+        loss_tan = np.logspace(self.pars['loss'][0], self.pars['loss'][1], np.int64(self.pars['loss'][2]))
 
         #Find each of the map subdirectories
         mapDirs = [name for name in os.listdir(self.pars['tempMapPath'])
@@ -79,13 +80,58 @@ class RadiativeTransfer(object):
         
         #Make their mirror in the output folder
         for mapDir in mapDirs:
-            if not os.path.exists(os.path.join(self.pars['tempMapPath'],mapDir)):
-                os.makedirs(os.path.join(self.pars['tempMapPath'],mapDir))
+            if not os.path.exists(os.path.join(self.pars['radiativePath'],mapDir)):
+                os.makedirs(os.path.join(self.pars['radiativePath'],mapDir))
 
         #Values to propagate into output maps
         keys = ['ti', 'emiss', 'rho', 'c', 'p_orb', 'p_rot', 'a_skin', 'd_skin', 'long']
 
         #Create the emission maps for each value of thermal inertia
         for mapDir in mapDirs:
+            #Find the maps for each longitude value
+            imFiles = glob(os.path.join(self.pars['tempMapPath'],mapDir) + '/tempmap_???.fits')
 
+            #Loop through each image
+            for imFile in imFiles:
+                print(f"Processing {os.path.basename(imFile)}")
+
+                #Load the model
+                with fits.open(imFile) as imFits:
+                    intensity = BlackBody(imFits[0].data * u.K)(u.Quantity(self.pars['freq'])).to_value('Jy/arcsec2')
+                    zz = imFits[1].data
+                    emi = imFits[2].data
+                    hdr = imFits[0].header
+
+                #Loop through the dielectric parameter space
+                images = np.zeros(nn.shape + loss_tan.shape + intensity.shape[1:])
+                for i in range(intensity.shape[-2]):
+                    for j in range(intensity.shape[-1]):
+                        if intensity[0, i, j] <= 0:
+                            continue
+                        #Initiate a layer with fixed n and loss tangent
+                        layer = Layer(n=1.5, loss_tangent=1e-2, profile=[zz, intensity[:, i, j]])
+                        surface = Surface(layer)
+
+                        for k, n in enumerate(nn):
+                            for t, l in enumerate(loss_tan):
+                                surface.layers[0].n = n
+                                surface.layers[0].loss_tangent = l
+                                images[k, t, i, j] = surface.emission(emi[i, j], u.Quantity(self.pars['freq']).to_value('m', u.spectral()))
+
+                #Save the simulated images
+                tmp = os.path.basename(imFile).split('_')
+                outFile = '_'.join(tmp[:-1] + ['rt'] + [tmp[-1]])
+                hdu = fits.PrimaryHDU(images.astype('float32'))
+                hdu.header['bunit'] = 'Jy/arcsec2'
+
+                for key in keys:
+                    hdu.header[key] = hdr[key], hdr.comments[key]
+
+                hdu1 = fits.ImageHDU(nn.astype('float32'), name='refidx')
+                hdu2 = fits.ImageHDU(loss_tan.astype('float32'), name='loss')
+
+                fits.HDUList([hdu, hdu1, hdu2]).writeto(os.path.join(self.pars['radiativePath'],mapDir,outFile))
+
+    def __call__(self):
+        self.getRadiativeTransfer()
 
