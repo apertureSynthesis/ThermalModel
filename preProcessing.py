@@ -11,6 +11,8 @@ from astropy.io import ascii
 from astropy.io import fits
 import astropy.units as u
 
+from ThermalModel.utils.helpers import getPars
+
 class preProcessing(object):
 
     """
@@ -33,9 +35,16 @@ class preProcessing(object):
             asteroid regolith density (kg m^-3)
             asteroid regolith specific heat (J K^-1 kg^-1)
 
+            Modeling parameters:
+            observing frequency
+            range of index of refraction to test [start, stop, inc] to be fed to np.linspace
+            range of loss tangent to test [start, stop, inc] to be fed to np.logspace
+
             Paths:
             krcFile: path to KRC model file
             reCastPath: path to store recast models
+            tempMapPath: path where temperature models are stored
+            radiativePath: path to save radiative transfer models
 
             Optional:
             withPlots: whether to include optional plots
@@ -53,26 +62,9 @@ class preProcessing(object):
         super().__init__()
 
         self.parFile = parFile
-
-    def getPars(self):
-        """
-        Read in content from the input parameter file 
-        and store them in a dictionary for later use
-        """
-
-        self.pars = {}
-        with open(self.parFile, 'r') as f:
-            for line in f:
-                if not line.startswith("#"):
-                    if line.rstrip():
-                        split_line = line.rstrip().split("#")
-                        var, val = split_line[0].split('=')
-                        var = var.replace('"','')
-                        val = val.replace('"','')
-                        self.pars[var.strip()] = val.strip()
+        self.pars = getPars(self.parFile)
 
     def reCast(self):
-
 
         #Check for the input file and output directories.
         if not os.path.exists(self.pars['krcFile']):
@@ -292,7 +284,6 @@ class preProcessing(object):
             plt.show()
 
     def __call__(self):
-        self.getPars()
         self.reCast()
         self.makePlots()
 
