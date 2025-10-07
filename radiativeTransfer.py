@@ -147,7 +147,6 @@ class radiativeTransfer(object):
             
             #Plot a sample file
             radFiles = glob(os.path.join(self.pars['radiativePath'],radDirs[0])+'/*.fits')
-            print(radFiles[0])
 
             if not radFiles:
                 print(f"No radiative transfer models found at {self.pars['radiativePath']}")
@@ -163,6 +162,7 @@ class radiativeTransfer(object):
                 plotIm = ax.imshow(plotImage,origin='lower',cmap='inferno')
                 cbar = plt.colorbar(plotIm)
                 cbar.set_label('Brightness Temperature (K)')
+                plt.title(f"Sample Brightness Plot for {self.pars['object']}")
                 plt.tight_layout()
                 plt.savefig(os.getcwd()+'/radiativeModel.pdf')
 

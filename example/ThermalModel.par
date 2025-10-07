@@ -1,0 +1,28 @@
+####################################
+##Pre-processing####################
+####################################
+
+#Physical parameters
+object = "Ganymed"
+rotational_period = "10.31284 hour"
+orbital_period = "4.35 year"
+rho = "11190 kg/m3"
+cs = "750 J/(K kg)"
+freq = "10 GHz"
+nn = [1.001, 2.5, 11]
+loss = [-4, 0, 9]
+
+#Paths
+krcFile = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/KRC/Ganymed_krc_temps.fits"
+reCastPath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/KRC_reCast"
+tempMapPath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/temp_maps"
+radiativePath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/radiativeModels"
+
+#Steps to complete
+doPreProcessing = False
+doRadiativeTransfer = False
+
+#Optional
+withPlots = True
+displayHeader = True
+######################################
