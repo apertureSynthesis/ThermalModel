@@ -46,6 +46,11 @@ class preProcessing(object):
             tempMapPath: path where temperature models are stored
             radiativePath: path to save radiative transfer models
 
+            Steps:
+            doPreProcessing: Should the pre-processing step be performed?
+            doRadiativeTransfer: Should the radiative transfer step be performed?
+            *Note: it is possible to generate plots for existing files without running these steps
+
             Optional:
             withPlots: whether to include optional plots
             displayHeader: whether to print a sample model header
@@ -66,92 +71,94 @@ class preProcessing(object):
 
     def reCast(self):
 
-        #Check for the input file and output directories.
-        if not os.path.exists(self.pars['krcFile']):
-            raise ValueError('KRC input file not found')
-        
-        if not os.path.exists(self.pars['reCastPath']):
-            os.makedirs(self.pars['reCastPath'])
+        #Are we performing the pre-processing or just making plots?
+        if self.pars['doPreProcessing'] == 'True':
+            #Check for the input file and output directories.
+            if not os.path.exists(self.pars['krcFile']):
+                raise ValueError('KRC input file not found')
+            
+            if not os.path.exists(self.pars['reCastPath']):
+                os.makedirs(self.pars['reCastPath'])
 
-        """
-        Open the file.
-        
-        Extension 0 contains temperature data with indices
-        [Depth, Emissivity, Thermal Inertia, Latitude, Local Solar Time]
+            """
+            Open the file.
+            
+            Extension 0 contains temperature data with indices
+            [Depth, Emissivity, Thermal Inertia, Latitude, Local Solar Time]
 
-        Extension 1 contains only the Local Solar Time
-        Extension 2 contains only the Latitude
-        Extension 3 contains only the Thermal Inertia
-        Extension 4 contains only the Emissivity
-        Extension 5 contains only the Depth
-        """
-        with fits.open(self.pars['krcFile']) as f:
-            temp  = f[0].data * u.K      #Temperature
-            lst   = f[1].data * u.hour   #Local Solar Time
-            lat   = np.squeeze(f[2].data) * u.deg  #Latitude
-            ti    = np.squeeze(f[3].data) * u.J / u.m**2 / u.K / (u.s**(1/2))  #Thermal Inertia
-            emis  = np.squeeze(f[4].data)  #Emissivity
-            depth = np.squeeze(f[5].data) * u.m  #Depth
+            Extension 1 contains only the Local Solar Time
+            Extension 2 contains only the Latitude
+            Extension 3 contains only the Thermal Inertia
+            Extension 4 contains only the Emissivity
+            Extension 5 contains only the Depth
+            """
+            with fits.open(self.pars['krcFile']) as f:
+                temp  = f[0].data * u.K      #Temperature
+                lst   = f[1].data * u.hour   #Local Solar Time
+                lat   = np.squeeze(f[2].data) * u.deg  #Latitude
+                ti    = np.squeeze(f[3].data) * u.J / u.m**2 / u.K / (u.s**(1/2))  #Thermal Inertia
+                emis  = np.squeeze(f[4].data)  #Emissivity
+                depth = np.squeeze(f[5].data) * u.m  #Depth
 
-        #Reorganize Extension 0 so that Local Solar Time comes first
-        temp = np.moveaxis(temp, 0, 3)
-        
-        #Change start time to noon
-        startTime = np.where(lst == 12 * u.hour)[0]
-        lst = np.roll(lst, -startTime)
+            #Reorganize Extension 0 so that Local Solar Time comes first
+            temp = np.moveaxis(temp, 0, 3)
+            
+            #Change start time to noon
+            startTime = np.where(lst == 12 * u.hour)[0]
+            lst = np.roll(lst, -startTime)
 
-        #Check that the time was successfully shifted
-        if lst[0] != 12 * u.hour:
-            raise ValueError("Incorrect time rephasing")
-        
-        #Now shift the temperature values
-        temp = np.roll(temp, -startTime, axis=-1)
+            #Check that the time was successfully shifted
+            if lst[0] != 12 * u.hour:
+                raise ValueError("Incorrect time rephasing")
+            
+            #Now shift the temperature values
+            temp = np.roll(temp, -startTime, axis=-1)
 
-        #Generate the files, one for each combination of Thermal Inertia and Emissivity
-        for i, e in enumerate(emis):
-            for j, t in enumerate(ti):
-                #Slice the temperature model
-                tref = temp[i, j]
+            #Generate the files, one for each combination of Thermal Inertia and Emissivity
+            for i, e in enumerate(emis):
+                for j, t in enumerate(ti):
+                    #Slice the temperature model
+                    tref = temp[i, j]
 
-                #Save the reference temperature model in Extension 0
-                hdu0 = fits.PrimaryHDU(tref.to_value('K'))
-                hdu0.header['bunit'] = 'K'
-                hdu0.header['ti'] = t.to_value('J/(m2 K s(1/2))'), 'Thermal Inertia'
-                hdu0.header['emiss'] = e, 'Emissivity'
-                hdu0.header['rho'] = u.Quantity(self.pars['rho']).to_value('kg/m3'), 'Density [kg/m**3]'
-                hdu0.header['cs'] = u.Quantity(self.pars['cs']).to_value('J/(K kg)'), 'Specific heat [J/(K kg)]'
-                hdu0.header['p_orb'] = u.Quantity(self.pars['orbital_period']).to_value('year'), 'Orbital Period [year]'
-                hdu0.header['p_rot'] = u.Quantity(self.pars['rotational_period']).to_value('hour'), 'Rotational Period [hour]'
+                    #Save the reference temperature model in Extension 0
+                    hdu0 = fits.PrimaryHDU(tref.to_value('K'))
+                    hdu0.header['bunit'] = 'K'
+                    hdu0.header['ti'] = t.to_value('J/(m2 K s(1/2))'), 'Thermal Inertia'
+                    hdu0.header['emiss'] = e, 'Emissivity'
+                    hdu0.header['rho'] = u.Quantity(self.pars['rho']).to_value('kg/m3'), 'Density [kg/m**3]'
+                    hdu0.header['cs'] = u.Quantity(self.pars['cs']).to_value('J/(K kg)'), 'Specific heat [J/(K kg)]'
+                    hdu0.header['p_orb'] = u.Quantity(self.pars['orbital_period']).to_value('year'), 'Orbital Period [year]'
+                    hdu0.header['p_rot'] = u.Quantity(self.pars['rotational_period']).to_value('hour'), 'Rotational Period [hour]'
 
-                hdu0.header['a_skin'] = (np.sqrt(u.Quantity(self.pars['orbital_period']) / np.pi) * t / (u.Quantity(self.pars['rho']) * u.Quantity(self.pars['cs']))).to_value('m'), 'Annual Thermal Skin Depth [m]'
-                hdu0.header['a_skin'] = (np.sqrt(u.Quantity(self.pars['rotational_period']) / np.pi) * t / (u.Quantity(self.pars['rho']) * u.Quantity(self.pars['cs']))).to_value('m'), 'Diurnal Thermal Skin Depth [m]'
+                    hdu0.header['a_skin'] = (np.sqrt(u.Quantity(self.pars['orbital_period']) / np.pi) * t / (u.Quantity(self.pars['rho']) * u.Quantity(self.pars['cs']))).to_value('m'), 'Annual Thermal Skin Depth [m]'
+                    hdu0.header['a_skin'] = (np.sqrt(u.Quantity(self.pars['rotational_period']) / np.pi) * t / (u.Quantity(self.pars['rho']) * u.Quantity(self.pars['cs']))).to_value('m'), 'Diurnal Thermal Skin Depth [m]'
 
-                #Extension 1 for Local Solar Time
-                hdu1 = fits.ImageHDU(lst.to_value('hour'), name='lst')
-                hdu1.header['bunit'] = 'hour'
+                    #Extension 1 for Local Solar Time
+                    hdu1 = fits.ImageHDU(lst.to_value('hour'), name='lst')
+                    hdu1.header['bunit'] = 'hour'
 
-                #Extension 2 for Depths
-                hdu2 = fits.ImageHDU(depth[:, j].to_value('m'), name='depth')
-                hdu2.header['bunit'] = 'm'
+                    #Extension 2 for Depths
+                    hdu2 = fits.ImageHDU(depth[:, j].to_value('m'), name='depth')
+                    hdu2.header['bunit'] = 'm'
 
-                #Extension 3 for latitude
-                hdu3 = fits.ImageHDU(lat.to_value('deg'), name='lat')
-                hdu3.header['bunit'] = 'deg'
+                    #Extension 3 for latitude
+                    hdu3 = fits.ImageHDU(lat.to_value('deg'), name='lat')
+                    hdu3.header['bunit'] = 'deg'
 
-                outFile = self.pars['reCastPath']+f'/temp_gamma_{t.value:.0f}_emiss_{e:.2f}.fits'
-                fits.HDUList([hdu0, hdu1, hdu2, hdu3]).writeto(outFile, overwrite=True)
+                    outFile = self.pars['reCastPath']+f'/temp_gamma_{t.value:.0f}_emiss_{e:.2f}.fits'
+                    fits.HDUList([hdu0, hdu1, hdu2, hdu3]).writeto(outFile, overwrite=True)
 
     def makePlots(self):
         """
         Make sample plots and display headers if requested
         """
-        if self.pars['displayHeader']:
+        if self.pars['displayHeader'] == 'True':
             print('KRC File Header Information:\n')
             with fits.open(self.pars['krcFile']) as f:
                 krcInfo = f.info()
             print(krcInfo)
 
-        if self.pars['withPlots']:
+        if self.pars['withPlots'] == 'True':
 
             """
             Plot of depths sampled by each thermal inertia value
