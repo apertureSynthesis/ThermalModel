@@ -158,7 +158,7 @@ class preProcessing(object):
                 krcInfo = f.info()
             print(krcInfo)
 
-        if self.pars['withPlots'] == 'True':
+        if self.pars['plotPreProcessing'] == 'True':
 
             """
             Plot of depths sampled by each thermal inertia value

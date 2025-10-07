@@ -2,3 +2,4 @@
 
 from .core import *
 from .helpers import *
+from .shapes import *

@@ -23,3 +23,28 @@ def getPars(parFile):
                         pars[var.strip()] = val.strip()
 
     return pars
+
+def convertObjToPlt(objFile):
+    """
+    Read in a shape model in .obj format and convert it to .plt format. Save the output file
+    """
+    pltFile = objFile[:-3]+'.plt'
+    nv = 0
+    nf = 0
+    with open(objFile, 'r') as fobj:
+        for line in fobj:
+            if line.startswith('v'):
+                nv += 1
+            if line.startswith('f'):
+                nf += 1
+    
+    with open(objFile, 'r') as fobj:
+        with open(pltFile, 'w') as fplt:
+            fplt.write(f"{nv:.0f} {nf:.0f}\n")
+            for line in fobj:
+                lsplit = line.split()
+                if line.startswith('v'):
+                    fplt.write(f"{lsplit[1]}\t{lsplit[2]}\t{lsplit[3]}]\n")
+                if line.startswidth('f'):
+                    fplt.write(f"{lsplit[1]}\t{lsplit[2]}\t{lsplit[3]}\n")
+

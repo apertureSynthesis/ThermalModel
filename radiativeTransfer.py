@@ -140,7 +140,8 @@ class radiativeTransfer(object):
                     fits.HDUList([hdu, hdu1, hdu2]).writeto(os.path.join(self.pars['radiativePath'],mapDir,outFile))
 
     def makePlots(self):
-        if self.pars['withPlots'] == 'True':
+        
+        if self.pars['plotRadiativeTransfer'] == 'True':
             #Find each of the output model subdirectories
             radDirs = [name for name in os.listdir(self.pars['radiativePath'])
                     if os.path.isdir(os.path.join(self.pars['radiativePath'], name))]
