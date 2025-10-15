@@ -152,7 +152,7 @@ class preProcessing(object):
         """
         Make sample plots and display headers if requested
         """
-        if self.pars['displayHeader'] == 'True':
+        if self.pars['displayKrcHeader'] == 'True':
             print('KRC File Header Information:\n')
             with fits.open(self.pars['krcFile']) as f:
                 krcInfo = f.info()

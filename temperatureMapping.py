@@ -16,4 +16,12 @@ class temperatureMapping(object):
     def getTemperatureMaps(self):
 
         if self.pars['doTemperatureMapping'] == 'True':
-            print('Ok')
+
+            #Check if a shape model file is provided. If so, use it.
+            #If not, use the tri-axial ellipsoid
+            if self.pars['shapeFile'] != 'None':
+                print('Using a shape model: any ellipsoid will be ignored.')
+            elif (self.pars['shapeFile'] == 'None') & (self.pars['shape_a'] != 'None'):
+                print('Using an ellipsoid')
+            else:
+                raise ValueError('Shape file or ellipsoid missing, but required for temperature profile calculation!')
