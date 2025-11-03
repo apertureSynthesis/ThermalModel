@@ -63,6 +63,14 @@ class preProcessing(object):
         model_plots.pdf: Summary plots of model contents
     """
 
+    """
+    To-do:
+
+    Add labels of annual and diurnal skin depth to TIU depth plot
+    Update label for time in temperature vs depth
+
+    """
+
     def __init__(self, parFile):
         super().__init__()
 

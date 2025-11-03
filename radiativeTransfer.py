@@ -60,6 +60,12 @@ class radiativeTransfer(object):
         model_plots.pdf: Summary plots of model contents
     """
 
+    """
+    To-do:
+    Add subsolar and subearth latitude to temperature plots
+    Need pixel size for Jy->K conversion
+    """
+
 
     def __init__(self,parFile):
         super().__init__()
