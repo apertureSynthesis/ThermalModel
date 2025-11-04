@@ -48,7 +48,7 @@ def polyConvert(shapes, xs, ys):
 
     shape = shapes.astype(np.float64)
 
-    n_vert = len(shape) / 3
+    n_vert = shape.size / 3
     xs = np.int(xs)
     ys = np.int(ys)
 
@@ -124,6 +124,17 @@ def rd2xyz(ra,dec):
 
     return np.array([[np.cos(dec*np.pi/180)*np.cos(ra*np.pi/180)],[np.cos(dec*np.pi/180)*np.sin(ra*np.pi/180)],[np.sin(dec*np.pi/180.)]])
 
+def xyz2rd(xyz):
+    vec = xyz.reshape((1,3))
+
+    x = vec[:,0]
+    y = vec[:,1]
+    z = vec[:,2]
+
+    rd = np.array([[(np.atan(y,x)+2*np.pi)%(2*np.pi)],[np.atan(z,np.sqrt(x**2+y**2))]]) * np.pi/180
+
+    return rd
+
 def pyrot2(r,phi,theta):
 
     rv = R.from_euler('yz',[theta,phi],degrees=True)
@@ -140,3 +151,73 @@ def vectMatchView(vertices,subEarthLatitude,subEarthLongitude,norAz):
     new_vertices = pyrot2(zvert, -90-norAz, 0)
 
     return vertices
+
+def meshNormal(vertices,polygons):
+
+    polygons = np.array(polygons)
+    surfNum = polygons.size / 3
+
+    vert = np.reshape(vertices[:,polygons], (3,3,surfNum))
+    p1 = np.squeeze(vert[:,0,:])
+    p2 = np.squeeze(vert[:,1,:])
+    p3 = np.squeeze(vert[:,2,:])
+
+    l=p1[1,:]*p2[2:]+p2[1,:]*p3[2,:]+p3[1,:]*p1[2,:]-p1[1,:]*p3[2,:]-p2[1,:]*p1[2,:]-p3[1,:]*p2[2,:]
+    l = np.squeeze(l)
+    m=p1[2,:]*p2[0,:]+p2[2,:]*p3[0,:]+p3[2,:]*p1[0,:]-p1[2,:]*p3[0,:]-p2[2,:]*p1[0,:]-p3[2,:]*p2[0,:]
+    m = np.squeeze(m)
+    n=p1[0,:]*p2[1,:]+p2[0,:]*p3[1,:]+p3[0,:]*p1[1,:]-p1[0,:]*p3[1:]-p2[0,:]*p1[1,:]-p3[0,:]*p2[1,:]
+    n = np.squeeze(n)
+    k = np.sqrt(l*l + m*m + n*n)
+    xyz = np.transpose(np.array([[l],[m],[n]])) / np.matmul(np.ones(3), k)
+    norm = np.transpose(xyz2rd(np.transpose(xyz)))
+    norm[1, :] = 90 - norm[1, :]
+
+    return norm
+
+def meshCenters(vertices, triangles):
+    triangles = np.array(triangles)
+    nTriangles = triangles.size / 3
+    centers = np.sum( np.reshape(vertices[:, triangles], (3,3,nTriangles)), axis=1) / 3
+    
+    return centers
+
+
+def meshGeoMap(vertices, triangles, sunpos, range, xres=1, yres=1, xs=256, ys=256):
+
+    #Set up variables
+    xscl = np.float64(xres) / range #pixel scale in radians/pixel
+    yscl = np.float64(yres) / range #pixel scale in radians/pixel
+
+    xc = xs / 2.
+    yc = ys / 2.
+
+    if range < 0:
+        obspos = [0, 0, 1e50]
+    else:
+        obspos = [0, 0, 1.] * range
+
+    nVert = vertices.size / 3.
+    nTriangle = triangles.size / 3.
+
+    imap = np.zeros((xs,ys), dtype=float)
+    emap = np.zeros((xs,ys), dtype=float)
+    amap = np.zeros((xs,ys), dtype=float)
+    mask = np.zeros((xs,ys), dtype=int)
+    pltmap = np.zeros((xs,ys), dtype=int)
+    pltmap[:,:] = -1
+
+    #compute the plate outward unit normal vectors
+    normals = meshNormal(vertices, triangles)
+
+    #incidence, emission, and phase angle lists of plates
+    centers = meshCenters(vertices, triangles)
+
+    vinc = (np.matmul(np.ones(nTriangle), sunpos)) - centers
+    vemi = (np.matmul(np.ones(nTriangle), obspos)) - centers
+
+    inc = np.acos(np.sum(normals*vinc, axis=0) / np.sqrt(np.sum(vinc*vinc, axis=0))) * 180/np.pi
+    emi = np.acos(np.sum(normals*vemi, axis=0) / np.sqrt(np.sum(vemi*vemi, axis=0))) * 180/np.pi
+    alpha = np.acos(np.sum(vinc*vemi, axis=0) / np.sqrt(np.sum(vinc*vinc, axis=0)*np.sum(vemi*vemi, axis=0))) * 180/np.pi
+
+    #Construct geometry maps for i, e, and alpha
