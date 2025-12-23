@@ -2,3 +2,8 @@ Pipeline for generating thermal models of asteroids for comparison against obser
 which are then converted to surface emission at a given frequency. 
 
 Many of the routines are adapted from Drs. Jian-Yang Li and Xiao-Duan Zou.
+
+Installation:
+
+Inside of a virtual environment run:
+pip install -r requirements.txt
