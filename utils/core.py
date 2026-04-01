@@ -23,8 +23,8 @@ class Snell(object):
         n1: number, refractive index of the first media
         n2: optional, number, refractive index of the second media
         """
-        self.n1 = n1
-        self.n2 = n2
+        self.n1 = np.asarray(n1, dtype=float) #shape (K,) or (K, T)
+        self.n2 = np.asarray(n2, dtype=float) #shape (K,) or (K, T)
 
     @staticmethod
     def refraction_angles(angle, n1, n2):
@@ -38,10 +38,11 @@ class Snell(object):
         n1: number, refractive index of the first (incident) media
         n2: number, refractive index of the second (emission) media
         """
-        sinangle = n1/n2 * np.sin(np.deg2rad(angle))
-        if sinangle > 1:
-            return np.nan
-        a = np.arcsin(sinangle)
+        sinangle = np.asarray(n1, dtype=float)/np.asarray(n2, dtype=float) * np.sin(np.deg2rad(angle))
+
+        #Clip to [-1, 1] to avoid arcsin domain errors for array inputs
+        ang = np.arcsin(np.clip(sinangle, -1.0, 1.0))
+        a = np.where(np.abs(sinangle) > 1, np.nan, ang)
         if not isinstance(angle, u.Quantity):
             a = np.rad2deg(a)
         return a
@@ -112,20 +113,19 @@ class Snell(object):
             raise ValueError('one angle has to be passed')
         if angle1 is not None:
             angle2 = self.angle2(angle1)
-        if angle2 is not None:
+        elif angle2 is not None:
             angle1 = self.angle1(angle2)
         if pol in ['s', 'normal', 'perpendicular', None]:
             a = self.n1 * np.cos(np.deg2rad(angle1))
             b = self.n2 * np.cos(np.deg2rad(angle2))
             Rs = ((a - b)/(a + b))**2
-            if not np.isfinite(Rs):
-                Rs = 1.0
+            Rs = np.where(np.isfinite(Rs), Rs, 1.0)
         if pol in ['p', 'in plane', 'parallel', None]:
             a = self.n1 * np.cos(np.deg2rad(angle2))
             b = self.n2 * np.cos(np.deg2rad(angle1))
             Rp = ((a - b)/(a + b))**2
-            if not np.isfinite(Rp):
-                Rp = 1.0
+
+            Rp = np.where(np.isfinite(Rp), Rp, 1.0)
         try:
             return (Rs + Rp)/2
         except NameError:
@@ -158,9 +158,9 @@ class Layer(object):
             If array-like, then profile[0] is depth and profile[1] is the
             physical quantity at corresponding depth.
         """
-        self.n = n
+        self.n = np.atleast_1d(np.asarray(n, dtype=float)) #shape (K,) or (K, T)
+        self.loss_tangent = np.atleast_1d(np.asarray(loss_tangent, dtype=float)) #shape (K,) or (K, T)
         self.depth = depth
-        self.loss_tangent = loss_tangent
         if profile is None:
             self.profile = None
         elif hasattr(profile, '__call__'):
@@ -190,7 +190,7 @@ class Layer(object):
             'm' if not specified.
         """
         if isinstance(wave_freq, u.Quantity):
-            wavelength = wave_freq.to(u.m, equivalencies=u.spectral())
+            wavelength = wave_freq.to(u.m, equivalencies=u.spectral()).value
         else:
             wavelength = wave_freq
         c = np.sqrt(1+self.loss_tangent*self.loss_tangent)
@@ -278,36 +278,57 @@ class Surface(object):
         self._check_layer_depth()
         self._check_layer_profile()
 
-        L = 0    # total path length of light in the unit of absorption length
-        n0 = 1.  # adjacent media outside of the layer to be calculated
-        m = 0.   # integrated quantity
-        trans_coef = 1.  # transmission coefficient = 1 - ref_coef
+        #Get the shape (K, T) of the parameters that are now arrays
+        param_shape = np.broadcast_shapes(
+            np.shape(self.layers[0].n),
+            np.shape(self.layers[0].loss_tangent)
+        ) #(K, T)
+        L = np.zeros(param_shape) # total path length of light in the unit of absorption length
+        m = np.zeros(param_shape) # integrated quantity
+        trans_coef = np.ones(param_shape) # transmission coefficient = 1 - ref_coef
+        n0 = 1.0 # adjacent media outside of the layer to be calculated
+        emi_ang_layer = emi_ang #emission angle updated per layer
         if debug:
             D = 0
             prof = {'t': [], 'intprofile': [], 'zzz': [], 'L0': []}
         for i,l in enumerate(self.layers):
             # integrate in layer `l`
-            snell = Snell(l.n, n0)
-            inc = snell.angle1(emi_ang)
-            ref_coef = snell.reflectance_coefficient(angle2=emi_ang)
+            snell = Snell(l.n, n0)      
+            inc = snell.angle1(emi_ang_layer)
+            ref_coef = snell.reflectance_coefficient(angle2=emi_ang_layer)
             coef = l.absorption_coefficient(wavelength)
             cos_i = np.cos(np.deg2rad(inc))
-            intfunc = lambda z: l.profile(z) * np.exp(-coef*z/cos_i-L)
             dd = -2.3026*np.log10(epsrel)/coef
-            #dd = l.profile.x.max()
-            if l.depth > dd:
-                zz = np.linspace(0, dd, 1000)
+            dd_s = float(np.max(dd))
+            if l.depth > dd_s:
+                zz = np.linspace(0, dd_s, 1000)
             else:
                 zz = np.linspace(0, l.depth, 1000)
+
+            profile_vals = l.profile(zz)   #Shape (Z,)
+
+            #Broadcast for integration
+            #coeff: (K, T) -> (K, T, 1)
+            #cos_i: (K, T) -> (K, T, 1)
+            #L: (K, T) -> (K, T, 1)
+            #zz: (Z,) -> (1, 1, Z)
+            coef_b = coef[..., np.newaxis] #(K, T, 1)
+            cos_i_b = cos_i[..., np.newaxis] #(K, T, 1)
+            L_b = L[..., np.newaxis] #(K, T, 1)
+            zz_b = zz[np.newaxis, np.newaxis, :] #(1, 1, Z)
+            intfunc_vals = (profile_vals[np.newaxis, np.newaxis, :] #(1, 1, Z)
+                            * np.exp(-coef_b * zz_b / cos_i_b - L_b)) #(K, T, Z)
+            
             if debug:
-                prof['t'].append(l.profile(zz))
-                prof['intprofile'].append(intfunc(zz))
-                prof['zzz'].append(zz+D)
+                prof['t'].append(l.profile(zz_b))
+                prof['intprofile'].append(intfunc_vals(zz_b))
+                prof['zzz'].append(zz_b+D)
                 prof['L0'].append(L)
                 D += l.depth
-            # from scipy.integrate import quad
-            # integral = quad(intfunc, 0, l.depth, epsrel=epsrel)[0]
-            integral = (intfunc(zz)[:-1]*(zz[1:]-zz[:-1])).sum()
+                
+            #Integrate over depth axis
+            dz = zz[1:] - zz[:-1] #(Z-1,)
+            integral = (intfunc_vals[..., :-1] * dz).sum(axis=-1) #(K, T)
             trans_coef *= (1-ref_coef)
             m += trans_coef*coef*integral/cos_i
             # prepare for the next layer

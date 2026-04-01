@@ -80,7 +80,7 @@ class preProcessing(object):
     def reCast(self):
 
         #Are we performing the pre-processing or just making plots?
-        if self.pars['doPreProcessing'] == 'True':
+        if self.pars['doPreProcessing']:
             #Check for the input file and output directories.
             if not os.path.exists(self.pars['krcFile']):
                 raise ValueError('KRC input file not found')
@@ -139,7 +139,7 @@ class preProcessing(object):
                     hdu0.header['p_rot'] = u.Quantity(self.pars['rotational_period']).to_value('hour'), 'Rotational Period [hour]'
 
                     hdu0.header['a_skin'] = (np.sqrt(u.Quantity(self.pars['orbital_period']) / np.pi) * t / (u.Quantity(self.pars['rho']) * u.Quantity(self.pars['cs']))).to_value('m'), 'Annual Thermal Skin Depth [m]'
-                    hdu0.header['a_skin'] = (np.sqrt(u.Quantity(self.pars['rotational_period']) / np.pi) * t / (u.Quantity(self.pars['rho']) * u.Quantity(self.pars['cs']))).to_value('m'), 'Diurnal Thermal Skin Depth [m]'
+                    hdu0.header['d_skin'] = (np.sqrt(u.Quantity(self.pars['rotational_period']) / np.pi) * t / (u.Quantity(self.pars['rho']) * u.Quantity(self.pars['cs']))).to_value('m'), 'Diurnal Thermal Skin Depth [m]'
 
                     #Extension 1 for Local Solar Time
                     hdu1 = fits.ImageHDU(lst.to_value('hour'), name='lst')
@@ -153,20 +153,20 @@ class preProcessing(object):
                     hdu3 = fits.ImageHDU(lat.to_value('deg'), name='lat')
                     hdu3.header['bunit'] = 'deg'
 
-                    outFile = self.pars['reCastPath']+f'/temp_gamma_{t.value:.0f}_emiss_{e:.2f}.fits'
+                    outFile = self.pars['reCastPath']+f'/tref_gamma_{t.value:.0f}_emiss_{e:.2f}.fits'
                     fits.HDUList([hdu0, hdu1, hdu2, hdu3]).writeto(outFile, overwrite=True)
 
     def makePlots(self):
         """
         Make sample plots and display headers if requested
         """
-        if self.pars['displayKrcHeader'] == 'True':
+        if self.pars['displayKrcHeader']:
             print('KRC File Header Information:\n')
             with fits.open(self.pars['krcFile']) as f:
                 krcInfo = f.info()
             print(krcInfo)
 
-        if self.pars['plotPreProcessing'] == 'True':
+        if self.pars['plotPreProcessing']:
 
             """
             Plot of depths sampled by each thermal inertia value
@@ -195,7 +195,7 @@ class preProcessing(object):
             Plots of (1) Surface temperature vs. LST: how surface temperature varies with TI through a diurnal cycle
             (2) Temperature vs. Depth: how temperature propagates into the subsurface at different times
             """
-            tfiles = [fits.open(f) for f in [self.pars['reCastPath']+f'/temp_gamma_{t:.0f}_emiss_0.90.fits' for t in TIs]]
+            tfiles = [fits.open(f) for f in [self.pars['reCastPath']+f'/tref_gamma_{t:.0f}_emiss_0.90.fits' for t in TIs]]
 
             fig, axs = plt.subplots(2, 1, figsize=(10,20), dpi=200)
             axs = axs.ravel()
@@ -220,7 +220,7 @@ class preProcessing(object):
             """
             Plot of temperature vs. time and depth for the first combination of TI and emissivity
             """
-            modelFile = self.pars['reCastPath']+f'/temp_gamma_{TIs[0]:.0f}_emiss_{emis[0]:.2f}.fits'
+            modelFile = self.pars['reCastPath']+f'/tref_gamma_{TIs[0]:.0f}_emiss_{emis[0]:.2f}.fits'
             with fits.open(modelFile) as f:
                 temp  = f[0].data  #Temperature
                 lst   = f['lst'].data #Local solar times (48 points in hours)

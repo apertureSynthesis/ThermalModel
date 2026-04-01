@@ -14,6 +14,8 @@ from astropy.modeling.physical_models import BlackBody
 
 from glob import glob
 
+from joblib import Parallel, delayed
+
 class radiativeTransfer(object):
 
     """
@@ -75,7 +77,7 @@ class radiativeTransfer(object):
 
     def getRadiativeTransfer(self):
         #Check that we are doing the radiative transfer and not just plotting
-        if self.pars['doRadiativeTransfer'] == 'True':
+        if self.pars['doRadiativeTransfer']:
             #Check for the input file and output directories.
             if not os.path.exists(self.pars['tempMapPath']):
                 raise ValueError('Temperature maps directory not found')
@@ -90,6 +92,8 @@ class radiativeTransfer(object):
             #Find each of the map subdirectories
             mapDirs = [name for name in os.listdir(self.pars['tempMapPath'])
                     if os.path.isdir(os.path.join(self.pars['tempMapPath'], name))]
+            if len(mapDirs) == 0:
+                raise ValueError("No temperature maps found")
             
             #Make their mirror in the output folder
             for mapDir in mapDirs:
@@ -97,16 +101,17 @@ class radiativeTransfer(object):
                     os.makedirs(os.path.join(self.pars['radiativePath'],mapDir))
 
             #Values to propagate into output maps
-            keys = ['ti', 'emiss', 'rho', 'c', 'p_orb', 'p_rot', 'a_skin', 'd_skin', 'long']
+            keys = ['ti', 'emiss', 'rho', 'cs', 'p_orb', 'p_rot', 'a_skin', 'd_skin', 'long']
 
             #Create the emission maps for each value of thermal inertia
             for mapDir in mapDirs:
                 #Find the maps for each longitude value
-                imFiles = glob(os.path.join(self.pars['tempMapPath'],mapDir) + '/tempmap_???.fits')
+                imFiles = sorted(glob(os.path.join(self.pars['tempMapPath'],mapDir) + '/tempmap_*.fits'))
 
                 #Loop through each image
                 for imFile in imFiles:
-                    print(f"Processing {os.path.basename(imFile)}")
+                    if not self.pars['suppressMessages']:
+                        print(f"Processing {os.path.basename(imFile)}")
 
                     #Load the model
                     with fits.open(imFile) as imFits:
@@ -117,19 +122,28 @@ class radiativeTransfer(object):
 
                     #Loop through the dielectric parameter space
                     images = np.zeros(nn.shape + loss_tan.shape + intensity.shape[1:])
-                    for i in range(intensity.shape[-2]):
-                        for j in range(intensity.shape[-1]):
-                            if intensity[0, i, j] <= 0:
-                                continue
-                            #Initiate a layer with fixed n and loss tangent
-                            layer = Layer(n=1.5, loss_tangent=1e-2, profile=[zz, intensity[:, i, j]])
-                            surface = Surface(layer)
+                    validPix = intensity[0] > 0
+                    validI, validJ = np.where(validPix)
+                    freqM = u.Quantity(self.pars['freq']).to_value('m', u.spectral())
 
-                            for k, n in enumerate(nn):
-                                for t, l in enumerate(loss_tan):
-                                    surface.layers[0].n = n
-                                    surface.layers[0].loss_tangent = l
-                                    images[k, t, i, j] = surface.emission(emi[i, j], u.Quantity(self.pars['freq']).to_value('m', u.spectral()))
+                    #Create grid of nn and loss_tan
+                    nn_grid, lt_grid = np.meshgrid(nn, loss_tan, indexing='ij') #(K, T)
+                    #for idx in range(len(validI)):
+                    #    i, j = validI[idx], validJ[idx]
+                    for idx in range(len(validI)):
+                        i, j = validI[idx], validJ[idx]
+                            #Initiate a layer with fixed n and loss tangent
+                        #layer = Layer(n=1.5, loss_tangent=1e-2, profile=[zz, intensity[:, i, j]])
+                        layer = Layer(n=nn_grid, loss_tangent=lt_grid,
+                                        profile=[zz, intensity[:, i, j]])
+                        surface = Surface(layer)
+                        images[..., i, j] = surface.emission(emi[i, j], freqM)
+
+                            # for k, n in enumerate(nn):
+                            #     for t, l in enumerate(loss_tan):
+                            #         surface.layers[0].n = n
+                            #         surface.layers[0].loss_tangent = l
+                            #         images[k, t, i, j] = surface.emission(emi[i, j], u.Quantity(self.pars['freq']).to_value('m', u.spectral()))
 
                     #Save the simulated images
                     tmp = os.path.basename(imFile).split('_')
@@ -143,35 +157,41 @@ class radiativeTransfer(object):
                     hdu1 = fits.ImageHDU(nn.astype('float32'), name='refidx')
                     hdu2 = fits.ImageHDU(loss_tan.astype('float32'), name='loss')
 
-                    fits.HDUList([hdu, hdu1, hdu2]).writeto(os.path.join(self.pars['radiativePath'],mapDir,outFile))
+                    fits.HDUList([hdu, hdu1, hdu2]).writeto(os.path.join(self.pars['radiativePath'],mapDir,outFile), overwrite=True)
 
     def makePlots(self):
+
         
-        if self.pars['plotRadiativeTransfer'] == 'True':
+        
+        if self.pars['plotRadiativeTransfer']:
             #Find each of the output model subdirectories
             radDirs = [name for name in os.listdir(self.pars['radiativePath'])
                     if os.path.isdir(os.path.join(self.pars['radiativePath'], name))]
             
             #Plot a sample file
-            radFiles = glob(os.path.join(self.pars['radiativePath'],radDirs[0])+'/*.fits')
+            radFiles = sorted(glob(os.path.join(self.pars['radiativePath'],radDirs[0])+'/*.fits'))
+            outputDir = os.path.join(self.pars['radiativePath'],radDirs[0])
 
             if not radFiles:
                 print(f"No radiative transfer models found at {self.pars['radiativePath']}")
             else:
-                with fits.open(radFiles[0]) as rF:
-                    images = rF[0].data
-                    hdr = rF[0].header
-                    nn = rF[1].data
-                    loss_tan = rF[2].data
+                imInd = 0
+                fig, axs = plt.subplots(len(radFiles),1,figsize=(5,5*len(radFiles)))
+                for radFile, lon in zip(radFiles,self.pars['subEarthLongitudes']):
+                    with fits.open(radFile) as rF:
+                        images = rF[0].data
+                        hdr = rF[0].header
+                        nn = rF[1].data
+                        loss_tan = rF[2].data
 
-                plotImage = images[0,0,:,:]*u.Unit(hdr['bunit']).to(u.K, equivalencies=u.brightness_temperature(u.Quantity(self.pars['freq'])))
-                fig, ax = plt.subplots(figsize=(6,6), dpi=200)
-                plotIm = ax.imshow(plotImage,origin='lower',cmap='inferno')
-                cbar = plt.colorbar(plotIm)
-                cbar.set_label('Brightness Temperature (K)')
-                plt.title(f"Sample Brightness Plot for {self.pars['object']}")
+                    plotImage = images[0,0,:,:]*u.Unit(hdr['bunit']).to(u.K, equivalencies=u.brightness_temperature(u.Quantity(self.pars['freq'])))
+                    #fig, ax = plt.subplots(figsize=(6,6), dpi=200)
+                    plotIm = axs[imInd].imshow(plotImage,origin='lower',cmap='viridis')
+                    cbar = plt.colorbar(plotIm, ax=axs[imInd],fraction=0.046,pad=0.04,location='top')
+                    cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:.0f}')
+                    imInd += 1
                 plt.tight_layout()
-                plt.savefig(os.getcwd()+'/radiativeModel.pdf')
+                plt.savefig(outputDir+'/radiativeModel.pdf',dpi=300)
 
 
     def __call__(self):

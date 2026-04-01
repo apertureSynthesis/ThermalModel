@@ -1,6 +1,9 @@
 ThermalModel - a package for generating thermophysical models of asteroids
 
 This code contains derivative work from Drs. Jian-Yang Li and Xiao-Duan Zou.
+See Li, Y.-J. et al. 2026, "Thermal and Dielectric Properties of Juno's Regolith
+at 1 Millimeter Wavelength", Planetary Science Journal, 7, 721,
+doi: 10.3847/PSJ/ae468f
 
 Copyright (C) 2025 Nathan Roth
 

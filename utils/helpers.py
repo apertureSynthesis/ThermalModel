@@ -20,7 +20,14 @@ def getPars(parFile):
                     if (val.strip()[0] == '[') & (val.strip()[-1] == ']'):
                         pars[var.strip()] = np.array(literal_eval(val.strip()))
                     else:
-                        pars[var.strip()] = val.strip()
+                        #Check for boolean
+                        if val.strip() == 'True':
+                            pval = True
+                        elif val.strip() == 'False':
+                            pval = False
+                        else:
+                            pval = val.strip()
+                        pars[var.strip()] = pval
 
     return pars
 

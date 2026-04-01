@@ -1,28 +1,97 @@
+###As of 04/01/26, NXR###
 ####################################
-##Pre-processing####################
+## Global parameters ###############
 ####################################
 
-#Physical parameters
+suppressMessages = True
+
+####################################
+## Pre-processing ##################
+####################################
+
+##Physical parameters
 object = "Ganymed"
 rotational_period = "10.31284 hour"
 orbital_period = "4.35 year"
 rho = "11190 kg/m3"
 cs = "750 J/(K kg)"
-freq = "10 GHz"
-nn = [1.001, 2.5, 11]
-loss = [-4, 0, 9]
 
-#Paths
-krcFile = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/KRC/Ganymed_krc_temps.fits"
-reCastPath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/KRC_reCast"
-tempMapPath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/temp_maps"
-radiativePath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-main/Ganymed/radiativeModels"
+##Input files
+krcFile = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed/KRC/Ganymed_krc_temps.fits"
 
-#Steps to complete
-doPreProcessing = False
-doRadiativeTransfer = False
 
-#Optional
-withPlots = True
-displayHeader = True
-######################################
+##Paths
+#Pre-processing output paths
+reCastPath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed/KRC-reCast"
+
+##Flags
+doPreProcessing = True
+plotPreProcessing = True
+displayKrcHeader = False
+
+####################################
+## Temperature Mapping #############
+####################################
+
+##Physical parameters
+#Triaxial ellipsoid lengths in km
+shape_a = 0.425 
+shape_b = 0.425 
+shape_c = 0.310 
+#Step size for latitude and longitude
+lat_step = 36
+lon_step = 72
+
+
+##Observing parameters
+#Heliocentric distance (au)
+rH = 1.31
+#Geocentric distance (au)
+delta = 0.39 
+#Sub-earth latitude
+subEarthLatitude = 36.3
+#Sub-solar latitude
+subSolarLatitude = 18.9
+#Difference between sub-Earth and sub-Solar longitude (sub-Solar = sub-Earth + deltaLon)
+deltaLon = -28
+#Sub-Earth longitudes to consider
+subEarthLongitudes = [0, 90, 180, 270]
+
+
+##Model parameters
+#x and y sizes of temperature map (pixels)
+xSize = 256 
+ySize = 256 
+#Model pixel size in milli-arcseconds
+pxlScale = 1
+
+##Input files - if shape file is present, ellipsoid will be ignored
+shapeFile = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed/Ganymed_261shape.plt"
+
+##Paths
+#Temperature mapping paths
+tempMapPath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed/temp_maps"
+
+##Flags
+doTemperatureMapping = True
+plotTemperatureMapping = True
+
+####################################
+## Radiative Transfer ##############
+####################################
+
+##Physical parameters
+freq = "33 GHz" #I defined X, Ku, and Ka as having mean frequencies of 10 GHz, 15 GHz, and 33 GHz based on the VLA frequency coverage
+nn = [1.001, 2.5, 10]
+loss = [-4, 0, 10]
+
+##Paths
+#Radiative transfer paths
+radiativePath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed/radiativeModels/KaBand/"
+
+##Flags
+doRadiativeTransfer = True
+plotRadiativeTransfer = True
+
+####################################
+####################################
