@@ -14,8 +14,6 @@ from astropy.modeling.physical_models import BlackBody
 
 from glob import glob
 
-from joblib import Parallel, delayed
-
 class radiativeTransfer(object):
 
     """
