@@ -126,22 +126,13 @@ class radiativeTransfer(object):
 
                     #Create grid of nn and loss_tan
                     nn_grid, lt_grid = np.meshgrid(nn, loss_tan, indexing='ij') #(K, T)
-                    #for idx in range(len(validI)):
-                    #    i, j = validI[idx], validJ[idx]
+
                     for idx in range(len(validI)):
                         i, j = validI[idx], validJ[idx]
-                            #Initiate a layer with fixed n and loss tangent
-                        #layer = Layer(n=1.5, loss_tangent=1e-2, profile=[zz, intensity[:, i, j]])
                         layer = Layer(n=nn_grid, loss_tangent=lt_grid,
                                         profile=[zz, intensity[:, i, j]])
                         surface = Surface(layer)
                         images[..., i, j] = surface.emission(emi[i, j], freqM)
-
-                            # for k, n in enumerate(nn):
-                            #     for t, l in enumerate(loss_tan):
-                            #         surface.layers[0].n = n
-                            #         surface.layers[0].loss_tangent = l
-                            #         images[k, t, i, j] = surface.emission(emi[i, j], u.Quantity(self.pars['freq']).to_value('m', u.spectral()))
 
                     #Save the simulated images
                     tmp = os.path.basename(imFile).split('_')
@@ -179,11 +170,8 @@ class radiativeTransfer(object):
                     with fits.open(radFile) as rF:
                         images = rF[0].data
                         hdr = rF[0].header
-                        nn = rF[1].data
-                        loss_tan = rF[2].data
 
                     plotImage = images[0,0,:,:]*u.Unit(hdr['bunit']).to(u.K, equivalencies=u.brightness_temperature(u.Quantity(self.pars['freq'])))
-                    #fig, ax = plt.subplots(figsize=(6,6), dpi=200)
                     plotIm = axs[imInd].imshow(plotImage,origin='lower',cmap='viridis')
                     cbar = plt.colorbar(plotIm, ax=axs[imInd],fraction=0.046,pad=0.04,location='top')
                     cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:.0f}')
