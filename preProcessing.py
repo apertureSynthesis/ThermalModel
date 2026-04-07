@@ -180,7 +180,7 @@ class preProcessing(object):
 
             fig, ax = plt.subplots(figsize=(6,6), dpi=200)
 
-            for i in range(depths.shape[1]):
+            for i in range(TIs.shape[0]):
                 ax.plot(np.arange(depths.shape[0]),depths[:,i],label=f"TI={TIs[i]:.0f}")
             ax.set_ylabel('Depth (m)')
             ax.set_xlabel('Index')

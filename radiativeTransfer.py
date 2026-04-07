@@ -14,6 +14,14 @@ from astropy.modeling.physical_models import BlackBody
 
 from glob import glob
 
+from joblib import Parallel, delayed
+
+def processPixel(i, j, zz, intensity, emi, nn_grid, lt_grid, freq):
+    layer = Layer(n=nn_grid, loss_tangent=lt_grid, profile=[zz, intensity])
+    surface = Surface(layer)
+    image = surface.emission(emi, freq)
+    return i, j, image
+
 class radiativeTransfer(object):
 
     """
@@ -127,12 +135,30 @@ class radiativeTransfer(object):
                     #Create grid of nn and loss_tan
                     nn_grid, lt_grid = np.meshgrid(nn, loss_tan, indexing='ij') #(K, T)
 
-                    for idx in range(len(validI)):
-                        i, j = validI[idx], validJ[idx]
-                        layer = Layer(n=nn_grid, loss_tangent=lt_grid,
-                                        profile=[zz, intensity[:, i, j]])
-                        surface = Surface(layer)
-                        images[..., i, j] = surface.emission(emi[i, j], freqM)
+                    if self.pars['doParallel']:
+                        if not self.pars['suppressMessages']:
+                            print('Performing parallel calculations')
+                        imageP = Parallel(n_jobs=-1, batch_size='auto')(
+                            delayed(processPixel)(
+                                i, j,
+                                zz,
+                                intensity[:, i, j],
+                                emi[i, j],
+                                nn_grid, lt_grid, freqM
+                            )
+                            for i, j in zip(validI, validJ)
+                        )
+                        for i, j, image in imageP:
+                            images[..., i, j] = image
+                    else:
+                        if not self.pars['suppressMessages']:
+                            print('Performing serial calculations')                        
+                        for idx in range(len(validI)):
+                            i, j = validI[idx], validJ[idx]
+                            layer = Layer(n=nn_grid, loss_tangent=lt_grid,
+                                            profile=[zz, intensity[:, i, j]])
+                            surface = Surface(layer)
+                            images[..., i, j] = surface.emission(emi[i, j], freqM)
 
                     #Save the simulated images
                     tmp = os.path.basename(imFile).split('_')

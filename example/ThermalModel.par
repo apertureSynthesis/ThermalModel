@@ -92,6 +92,7 @@ radiativePath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed
 ##Flags
 doRadiativeTransfer = True
 plotRadiativeTransfer = True
+doParallel = True
 
 ####################################
 ####################################
