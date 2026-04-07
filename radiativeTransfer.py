@@ -99,7 +99,7 @@ class radiativeTransfer(object):
                     os.makedirs(os.path.join(self.pars['radiativePath'],mapDir))
 
             #Values to propagate into output maps
-            keys = ['ti', 'emiss', 'rho', 'cs', 'p_orb', 'p_rot', 'a_skin', 'd_skin', 'long']
+            keys = ['ti', 'emiss', 'rho', 'c', 'p_orb', 'p_rot', 'a_skin', 'd_skin', 'long']
 
             #Create the emission maps for each value of thermal inertia
             for mapDir in mapDirs:
@@ -172,10 +172,15 @@ class radiativeTransfer(object):
                         hdr = rF[0].header
 
                     plotImage = images[0,0,:,:]*u.Unit(hdr['bunit']).to(u.K, equivalencies=u.brightness_temperature(u.Quantity(self.pars['freq'])))
-                    plotIm = axs[imInd].imshow(plotImage,origin='lower',cmap='viridis')
-                    cbar = plt.colorbar(plotIm, ax=axs[imInd],fraction=0.046,pad=0.04,location='top')
-                    cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:.0f}')
-                    imInd += 1
+                    if len(radFiles) > 1:
+                        plotIm = axs[imInd].imshow(plotImage,origin='lower',cmap='viridis')
+                        cbar = plt.colorbar(plotIm, ax=axs[imInd],fraction=0.046,pad=0.04,location='top')
+                        cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:.0f}')
+                    else:
+                        plotIm = axs.imshow(plotImage,origin='lower',cmap='viridis')
+                        cbar = plt.colorbar(plotIm, ax=axs,fraction=0.046,pad=0.04,location='top')
+                        cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:.0f}')      
+                    imInd += 1                  
                 plt.tight_layout()
                 plt.savefig(outputDir+'/radiativeModel.pdf',dpi=300)
 

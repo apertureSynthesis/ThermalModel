@@ -134,7 +134,7 @@ class preProcessing(object):
                     hdu0.header['ti'] = t.to_value('J/(m2 K s(1/2))'), 'Thermal Inertia'
                     hdu0.header['emiss'] = e, 'Emissivity'
                     hdu0.header['rho'] = u.Quantity(self.pars['rho']).to_value('kg/m3'), 'Density [kg/m**3]'
-                    hdu0.header['cs'] = u.Quantity(self.pars['cs']).to_value('J/(K kg)'), 'Specific heat [J/(K kg)]'
+                    hdu0.header['c'] = u.Quantity(self.pars['cs']).to_value('J/(K kg)'), 'Specific heat [J/(K kg)]'
                     hdu0.header['p_orb'] = u.Quantity(self.pars['orbital_period']).to_value('year'), 'Orbital Period [year]'
                     hdu0.header['p_rot'] = u.Quantity(self.pars['rotational_period']).to_value('hour'), 'Rotational Period [hour]'
 

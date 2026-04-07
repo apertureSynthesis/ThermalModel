@@ -66,7 +66,7 @@ class temperatureMapping(object):
             tFiles = glob(self.pars['reCastPath']+'/*tref_gamma*_emis*.fits')
 
             #FITS keys to propogate to output
-            keys = ['ti', 'emiss', 'rho', 'cs', 'p_orb', 'p_rot', 'a_skin', 'd_skin']
+            keys = ['ti', 'emiss', 'rho', 'c', 'p_orb', 'p_rot', 'a_skin', 'd_skin']
 
             #Prepare longitudes
             subeLon = self.pars['subEarthLongitudes']

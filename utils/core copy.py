@@ -72,9 +72,11 @@ class Snell(object):
     @property
     def critical_angle(self):
         """Critial angle of reflection"""
-        n1S = np.minimum(self.n1, self.n2)
-        n2S = np.maximum(self.n1, self.n2)
-        return np.rad2deg(np.arcsin(n1S/n2S))
+        n1 = self.n1
+        n2 = self.n2
+        if n1 > n2:
+            n1, n2 = n2, n1
+        return np.rad2deg(np.arcsin(n1/n2))
 
     @property
     def brewster_angle(self):
@@ -297,38 +299,36 @@ class Surface(object):
             coef = l.absorption_coefficient(wavelength)
             cos_i = np.cos(np.deg2rad(inc))
             dd = -2.3026*np.log10(epsrel)/coef
-            ddLayer = np.where(l.depth > dd, dd, l.depth)
-            zNorm = np.linspace(0, 1, 1000)
-            zzLayer = ddLayer[..., np.newaxis] * zNorm
-            # if l.depth > dd_s:
-            #     zz = np.linspace(0, dd_s, 1000)
-            # else:
-            #     zz = np.linspace(0, l.depth, 1000)
+            dd_s = float(np.max(dd))
+            if l.depth > dd_s:
+                zz = np.linspace(0, dd_s, 1000)
+            else:
+                zz = np.linspace(0, l.depth, 1000)
 
-            profile_vals = l.profile(zzLayer)   #Shape (Z,)
+            profile_vals = l.profile(zz)   #Shape (Z,)
 
             #Broadcast for integration
             #coeff: (K, T) -> (K, T, 1)
             #cos_i: (K, T) -> (K, T, 1)
             #L: (K, T) -> (K, T, 1)
             #zz: (Z,) -> (1, 1, Z)
-            coefLayer = coef[..., np.newaxis] #(K, T, 1)
-            cos_i_Layer = cos_i[..., np.newaxis] #(K, T, 1)
-            L_Layer = L[..., np.newaxis] #(K, T, 1)
+            coef_b = coef[..., np.newaxis] #(K, T, 1)
+            cos_i_b = cos_i[..., np.newaxis] #(K, T, 1)
+            L_b = L[..., np.newaxis] #(K, T, 1)
             #zz_b = zz[np.newaxis, np.newaxis, :] #(1, 1, Z)
-            intfunc_vals = (profile_vals #(1, 1, Z)
-                            * np.exp(-coefLayer * zzLayer / cos_i_Layer - L_Layer)) #(K, T, Z)
+            intfunc_vals = (profile_vals[np.newaxis, np.newaxis, :] #(1, 1, Z)
+                            * np.exp(-coef_b * zz / cos_i_b - L_b)) #(K, T, Z)
             
             if debug:
-                prof['t'].append(l.profile(zzLayer))
+                prof['t'].append(l.profile(zz))
                 prof['intprofile'].append(intfunc_vals)
-                prof['zzz'].append(zzLayer+D)
+                prof['zzz'].append(zz+D)
                 prof['L0'].append(L)
                 D += l.depth
                 
             #Integrate over depth axis
-            dzLayer = zzLayer[..., 1:] - zzLayer[..., :-1] #(Z-1,)
-            integral = (intfunc_vals[..., :-1] * dzLayer).sum(axis=-1) #(K, T)
+            dz = zz[1:] - zz[:-1] #(Z-1,)
+            integral = (intfunc_vals[..., :-1] * dz).sum(axis=-1) #(K, T)
             trans_coef *= (1-ref_coef)
             m += trans_coef*coef*integral/cos_i
             # prepare for the next layer
