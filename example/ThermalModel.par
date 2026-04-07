@@ -95,4 +95,16 @@ plotRadiativeTransfer = True
 doParallel = True
 
 ####################################
+## Model Fitting ##############
+####################################
+
+#Combined model output path
+combinedModelPath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal-fit-Henry-v1/Ganymed/combinedModels/KaBand"
+
+##Flags
+doCombinedModel = True
+doModelPlotting = True
+
+
+####################################
 ####################################
