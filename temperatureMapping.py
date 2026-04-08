@@ -74,8 +74,9 @@ class temperatureMapping(object):
             subeLat = np.zeros(nLon) + np.float64(self.pars['subEarthLatitude'])
             subsLon = (subeLon + np.float64(self.pars['deltaLon'])) % 360
             subsLat = np.zeros(nLon) + np.float64(self.pars['subSolarLatitude'])
-            rH = np.zeros(nLon) + np.float64(self.pars['rH'])
-            delta = np.zeros(nLon) + np.float64(self.pars['delta'])
+            rH = np.zeros(nLon) + u.Quantity(self.pars['rH'])
+            delta = np.zeros(nLon) + u.Quantity(self.pars['delta'])
+            pxlScl = u.Quantity(self.pars['pxlScale'])
 
             #Iterate through each model
             for tFile in tFiles:
@@ -109,12 +110,13 @@ class temperatureMapping(object):
                     if not self.pars['suppressMessages']:
                         print(f"Sub-Earth longitude: {subeLon[i]}")
 
-                    sunPos = vectMatchView(rd2xyz([subsLon[i], subsLat[i]]), subeLat[i], subeLon[i], 0) * rH[i] * 1.496e8
+                    sunPos = vectMatchView(rd2xyz([subsLon[i], subsLat[i]]), subeLat[i], subeLon[i], 0) * rH[i].to_value("km")
                     newVertices = vectMatchView(vertices, subeLat[i], subeLon[i], 0)
-                    res = np.float64(self.pars['pxlScale']) * delta[i] * 1.496e8 / 206265000 #Image resolution in km from mas
+                    #res = np.float64(self.pars['pxlScale']) * delta[i] * 1.496e8 / 206265000 #Image resolution in km from mas
+                    res = delta[i].to_value('km') * np.tan(pxlScl.to_value("rad")) #Image resolution in km
 
                     #Note - although shadow-casting is available in the code, it has historically not been implemented.
-                    iMap, eMap, aMap, mask, pltMap = meshGeoMap(newVertices, triangles, sunPos, delta[i]*1.496e8, xres=res, yres=res,
+                    iMap, eMap, aMap, mask, pltMap = meshGeoMap(newVertices, triangles, sunPos, delta[i].to_value("km"), xres=res, yres=res,
                                                                 xs = int(self.pars['xSize']), ys=int(self.pars['ySize']), noShadow=True)
 
                     #Save the plate map and plate files

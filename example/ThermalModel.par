@@ -45,9 +45,9 @@ lon_step = 72
 
 ##Observing parameters
 #Heliocentric distance (au)
-rH = 1.31
+rH = "1.31 au"
 #Geocentric distance (au)
-delta = 0.39 
+delta = "0.39 au" 
 #Sub-earth latitude
 subEarthLatitude = 36.3
 #Sub-solar latitude
@@ -63,7 +63,7 @@ subEarthLongitudes = [0, 90, 180, 270]
 xSize = 256 
 ySize = 256 
 #Model pixel size in milli-arcseconds
-pxlScale = 1
+pxlScale = "2.8 mas"
 
 ##Input files - if shape file is present, ellipsoid will be ignored
 shapeFile = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed/Ganymed_261shape.plt"
