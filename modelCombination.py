@@ -71,9 +71,9 @@ class modelCombination(object):
                 print(f"Found {nTI:0d} unique TI's and {nEmis:0d} unique emissivities.")
 
             #Prepare to integrate the models and combine
-            pxlScl = np.float64(self.pars['pxlScale'])*u.mas
-            pxlSclOmega = (pxlScl.to(u.rad))**2
-            pxlSclOmegaSr = pxlSclOmega.to(u.sr)
+            pxlScl = u.Quantity(self.pars['pxlScale'])
+            pxlSclOmega = (pxlScl.to("rad"))**2
+            pxlSclOmegaSr = pxlSclOmega.to("sr")
 
             #Shape nti*nemis, nlon, nref, nloss
             fluxAll = []
