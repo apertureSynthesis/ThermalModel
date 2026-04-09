@@ -189,7 +189,6 @@ class preProcessing(object):
             plt.grid(True)
             plt.tight_layout()
             plt.savefig(os.getcwd()+'/TI-Depth.pdf')
-            plt.show()
 
             """
             Plots of (1) Surface temperature vs. LST: how surface temperature varies with TI through a diurnal cycle
@@ -215,7 +214,6 @@ class preProcessing(object):
 
             plt.tight_layout()
             plt.savefig(os.getcwd()+'/Temperature-Plots.pdf')
-            plt.show()
 
             """
             Plot of temperature vs. time and depth for the first combination of TI and emissivity
@@ -249,7 +247,6 @@ class preProcessing(object):
 
             plt.tight_layout()
             plt.savefig(os.getcwd()+'/Temperature-Depth-Time.pdf')
-            plt.show()
 
             """
             Plot of Temperature vs LST and Depth (2D)
@@ -278,7 +275,6 @@ class preProcessing(object):
 
             plt.tight_layout()
             plt.savefig(os.getcwd()+'/Temperature-Depth-LST.pdf')
-            plt.show()
 
             """
             Plot surface temperature vs LST for a variety of latitudes
@@ -296,12 +292,7 @@ class preProcessing(object):
             plt.grid(True)
             plt.tight_layout()
             plt.savefig(os.getcwd()+'/Temperature-LST-Latitude.pdf')
-            plt.show()
 
     def __call__(self):
         self.reCast()
         self.makePlots()
-
-
-
-
