@@ -5,3 +5,5 @@ ipython
 jupyter
 pylint
 astroquery
+scipy
+joblib
