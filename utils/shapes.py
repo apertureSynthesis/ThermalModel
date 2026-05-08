@@ -654,25 +654,20 @@ def meshGeoMap(vertices, triangles, sunPos, dRange,
         a = vertCan[:, triangles[0, j]]
         b = vertCan[:, triangles[1, j]]
         c = vertCan[:, triangles[2, j]]
+        
+        mMin = max(int(np.floor(min(a[0], b[0], c[0]))), 0)
+        mMax = min(int(np.ceil(max(a[0], b[0], c[0]))), xs - 1)
+        nMin = max(int(np.floor(min(a[1], b[1], c[1]))), 0)
+        nMax = min(int(np.ceil(max(a[1], b[1], c[1]))), ys - 1)
+        
+        #Skip this facet if the bounding box is outside the image
+        if mMin > mMax or nMin > nMax:
+            continue
 
-        #Edge vectors
-        ba = b[:2] - a[:2]
-        cb = c[:2] - b[:2]
-        ac = a[:2] - c[:2]
-        
-        mMin = int(np.floor(min(a[0], b[0], c[0])))
-        mMax = int(np.ceil(max(a[0], b[0], c[0])))
-        nMin = int(np.floor(min(a[1], b[1], c[1])))
-        nMax = int(np.ceil(max(a[1], b[1], c[1])))
-        
         m0, n0, z0 = a[0], a[1], a[2]
 
         #Center of the plate        
         center = np.array([np.mean([a[0], b[0], c[0]]), np.mean([a[1], b[1], c[1]])])
-
-        #Each possible pixel index
-        mRange = range(max(mMin, 0), min(mMax, xs - 1) + 1)
-        nRange = range(max(nMin, 0), min(nMax, ys - 1) + 1)
 
         aDis = np.array([
             [b[1] - a[1], c[1] - b[1], a[1] - c[1]],
@@ -688,21 +683,57 @@ def meshGeoMap(vertices, triangles, sunPos, dRange,
         #Calculate distance from the center to each side of the plate
         dCenter = center @ aDis + cDis
         
-        for m in mRange:
-            for n in nRange:
-                p = np.array([m, n])
-                #Calculate distance from each point p to each side of the plate
-                Dmn = p @ aDis + cDis
+        #Create a grid of all pixels in the bounding box
+        mVals = np.arange(mMin, mMax + 1)
+        nVals = np.arange(nMin, nMax + 1)
+        mGrid, nGrid = np.meshgrid(mVals, nVals)
+        mFlat = mGrid.ravel()
+        nFlat = nGrid.ravel()
 
-                if np.min(dCenter * Dmn) >= 0: #If True, this pixel is in the plate
-                    z = z0 + (m - m0) * zGrad[0, j] + (n - n0) * zGrad[1, j]
-                    if z > zBuffer[n, m]: #If True, this takes the place of the previous pixel
-                        zBuffer[n, m] = z
-                        iMap[n, m] = inc[j]
-                        eMap[n, m] = emi[j]
-                        aMap[n, m] = alpha[j]
-                        pltMap[n, m] = j
-                        mask[n, m] = 1 if inc[j] > 90 else 3
+        #Calculate distances for all pixels simultaneously
+        P = np.vstack((mFlat, nFlat))
+        Dmn = P.T @ aDis + cDis
+
+        #Find all pixels within the facet
+        inTriangle = np.all((dCenter * Dmn) >= 0, axis=1)
+
+        if np.any(inTriangle):
+            mIn = mFlat[inTriangle]
+            nIn = nFlat[inTriangle]
+
+            #Calculate Z depths for all valid pixels
+            zVals = z0 + (mIn - m0) * zGrad[0, j] + (nIn - n0) * zGrad[1, j]
+
+            #Check the Z-buffer for all valid pixels
+            zMask = zVals > zBuffer[nIn, mIn]
+
+            if np.any(zMask):
+                #Update Z-index, incidence, emission, phase arrays
+                mZ = mIn[zMask]
+                nZ = nIn[zMask]
+
+                zBuffer[nZ, mZ] = zVals[zMask]
+                iMap[nZ, mZ] = inc[j]
+                eMap[nZ, mZ] = emi[j]
+                aMap[nZ, mZ] = alpha[j]
+                pltMap[nZ, mZ] = j
+                mask[nZ, mZ] = 1 if inc[j] > 9 else 3
+
+        # for m in mRange:
+        #     for n in nRange:
+        #         p = np.array([m, n])
+        #         #Calculate distance from each point p to each side of the plate
+        #         Dmn = p @ aDis + cDis
+
+        #         if np.min(dCenter * Dmn) >= 0: #If True, this pixel is in the plate
+        #             z = z0 + (m - m0) * zGrad[0, j] + (n - n0) * zGrad[1, j]
+        #             if z > zBuffer[n, m]: #If True, this takes the place of the previous pixel
+        #                 zBuffer[n, m] = z
+        #                 iMap[n, m] = inc[j]
+        #                 eMap[n, m] = emi[j]
+        #                 aMap[n, m] = alpha[j]
+        #                 pltMap[n, m] = j
+        #                 mask[n, m] = 1 if inc[j] > 90 else 3
 
     if bench:
         print(f'Image generation done in {time.time() - t0:.4f} seconds')
@@ -780,23 +811,40 @@ def meshGeoMap(vertices, triangles, sunPos, dRange,
     
     #Transform vertices back to scattering frame
     vert1 = xFormScat.T @ vertices
+
+    #Calculate all potential bounding boxes
+    vA = vert1[:, triangles[0, :]]
+    vB = vert1[:, triangles[1, :]]
+    vC = vert1[:, triangles[2, :]]
+
+    all_yMin = np.min([vA[1], vB[1], vC[1]], axis=0)
+    all_yMax = np.max([vA[1], vB[1], vC[1]], axis=0)
+    all_zMin = np.min([vA[2], vB[2], vC[2]], axis=0)
+    all_zMax = np.max([vA[2], vB[2], vC[2]], axis=0)
+    all_xMin = np.min([vA[0], vB[0], vC[0]], axis=0)
     
     for j in range(nTriangle):
-        a = vert1[:, triangles[0, j]]
-        b = vert1[:, triangles[1, j]]
-        c = vert1[:, triangles[2, j]]
+        # a = vert1[:, triangles[0, j]]
+        # b = vert1[:, triangles[1, j]]
+        # c = vert1[:, triangles[2, j]]
         
-        yminJ, ymaxJ = min(a[1], b[1], c[1]), max(a[1], b[1], c[1])
-        zminJ, zmaxJ = min(a[2], b[2], c[2]), max(a[2], b[2], c[2])
-        xmin = min(a[0], b[0], c[0])
+        # yminJ, ymaxJ = min(a[1], b[1], c[1]), max(a[1], b[1], c[1])
+        # zminJ, zmaxJ = min(a[2], b[2], c[2]), max(a[2], b[2], c[2])
+        # xmin = min(a[0], b[0], c[0])
+
+        yminJ, ymaxJ = all_yMin[j], all_yMax[j]
+        zminJ, zmaxJ = all_zMin[j], all_zMax[j]
+        xMin = all_xMin[j]
         
         if not (ymaxJ < minY or yminJ > maxY or zmaxJ < minZ or zminJ > maxZ):
 
             #Map triangle z-extents to quantization bins
-            zminJQ = int(np.floor((zminJ - minZ) / zRange * (qLevel - 1)))
-            zminJQ = max(0, min(zminJQ, qLevel - 1))
-            zmaxJQ = int(np.floor((zmaxJ - minZ) / zRange * (qLevel - 1)))
-            zmaxJQ = max(0, min(zmaxJQ, qLevel - 1))
+            zminJQ = max(0, min(int(np.floor((zminJ - minZ) / zRange * (qLevel - 1))), qLevel - 1))
+            #zminJQ = int(np.floor((zminJ - minZ) / zRange * (qLevel - 1)))
+            #zminJQ = max(0, min(zminJQ, qLevel - 1))
+            zmaxJQ = max(0, min(int(np.floor((zmaxJ - minZ) / zRange * (qLevel - 1)))), qLevel - 1)
+            # zmaxJQ = int(np.floor((zmaxJ - minZ) / zRange * (qLevel - 1)))
+            # zmaxJQ = max(0, min(zmaxJQ, qLevel - 1))
 
             #Retrieve only pixels whose quantized z falls in [zminJQ, zmaxJQ]
             ind1 = zSort[zQuanUniq[zminJQ + 1]: zQuanUniq[zmaxJQ + 2]]
@@ -804,6 +852,10 @@ def meshGeoMap(vertices, triangles, sunPos, dRange,
             if len(ind1) == 0:
                 continue
             pixr1 = pixr[:, ind1]
+            a = vA[:, j]
+            b = vB[:, j]
+            c = vC[:, j]
+
             aDis = np.array([
                 [b[2] - a[2], c[2] - b[2], a[2] - c[2]],
                 [a[1] - b[1], b[1] - c[1], c[1] - a[1]]
@@ -831,10 +883,19 @@ def meshGeoMap(vertices, triangles, sunPos, dRange,
                     np.min(smx * dCenter, axis=1) > 0
                     )[0]
                 
-                for p in blocked:
-                    idx = inPltPix[p]
-                    if pixr[0, idx] < xmin:
-                        pixelsFlat[effpixFlat[idx]] = 2
+                # for p in blocked:
+                #     idx = inPltPix[p]
+                #     if pixr[0, idx] < xmin:
+                #         pixelsFlat[effpixFlat[idx]] = 2
+                if len(blocked) > 0:
+                    #Get indices referencing pixr / effpixFlat
+                    oInd = ind1[inPltPix[blocked]]
+
+                    #Filter for pixels physically behind the triangle (x < xMin)
+                    pMask = pixr[0, oInd] < xMin
+                    pInd = oInd[pMask]
+
+                    pixelsFlat[effpixFlat[pInd]] = 2
 
     mask = pixelsFlat.reshape((xs, ys))
     print('Shadow correction performed')

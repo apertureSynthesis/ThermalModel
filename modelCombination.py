@@ -260,7 +260,7 @@ class modelCombination(object):
             for i in range(len(gamma)):
                 ax.plot(lonVals, flux[i, 2, :, 2, -2], 'o')
             plt.text(0.8, 0.1, f"$\\epsilon$ = {emis[2]:.2f}", transform=ax.transAxes)
-            plt.text(0.8, 0.06, f"n = {refIdx[i]:.2f}", transform=ax.transAxes)
+            plt.text(0.8, 0.06, f"n = {refIdx[2]:.2f}", transform=ax.transAxes)
             plt.text(0.8, 0.02, f"$\\tan\\Delta$ = {loss[-2]:.2f}", transform=ax.transAxes)
             ax.set_xlabel('Longitude (deg)')
             ax.set_ylabel('Flux (Jy)')

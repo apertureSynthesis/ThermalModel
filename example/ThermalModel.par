@@ -92,7 +92,9 @@ radiativePath = "/Users/nxroth/Desktop/asteroid-modeling/Thermal_fit-NXR/Ganymed
 ##Flags
 doRadiativeTransfer = True
 plotRadiativeTransfer = True
-doParallel = True
+#Warning - vectorization may use significant amounts of RAM for large grids
+doVectorize = True
+doParallel = False
 
 ####################################
 ## Model Fitting ##############

@@ -134,8 +134,8 @@ class Snell(object):
                 return Rp
 
 
-class Layer(object):
-    """Layer class for calculating propagation of subsurface thermal emission
+class vectorLayer(object):
+    """vectorLayer class for calculating propagation of subsurface thermal emission
 
     """
 
@@ -164,14 +164,12 @@ class Layer(object):
             self.profile = None
         elif hasattr(profile, '__call__'):
             self.profile = profile
-        elif np.shape(profile)[0] == 2:
+        #elif np.shape(profile)[0] == 2:
+        elif isinstance(profile, (list, type)) and len(profile) == 2:
+            self.profile = interp1d(profile[0], profile[1], axis=0, 
+                                    bounds_error=False,
+                                    fill_value=(profile[1][0], profile[1][-1]))
 
-            #self.profile = interp1d(profile[0], profile[1], bounds_error=False,
-            #                        fill_value=(profile[1][0], profile[1][-1]))
-            xprofile = np.asarray(profile[0], dtype=float)
-            fprofile = np.asarray(profile[1], dtype=float)
-
-            self.profile = lambda z: np.interp(z, xprofile, fprofile) 
         else:
             raise ValueError('Unrecogniazed type or format for `profile`')
 
@@ -199,9 +197,9 @@ class Layer(object):
         c = np.sqrt(1+self.loss_tangent*self.loss_tangent)
         return (4*np.pi*self.n)/wavelength*np.sqrt((c-1)/(c+1))
 
-class Surface(object):
+class vectorSurface(object):
     """
-    Surface class that contain subsurface layers and calculates the observables
+    vectorSurface class that contain subsurface layers and calculates the observables
     from the surface, such as brightness temperature or thermal emission, etc.
 
     Based on the models in Keihm & Langseth (1975), Icarus 24, 211-230
@@ -209,7 +207,7 @@ class Surface(object):
 
     def __init__(self, layers, profile=None):
         """
-        layers: SubsurfaceLayer class object or array_like of it, the
+        layers: SubsurfacevectorLayer class object or array_like of it, the
             subsurface layers.  If array-like, then the layers are ordered
             from the top surface downward.
         profile : optional, array-like of shape (2, N)
@@ -233,22 +231,20 @@ class Surface(object):
             if hasattr(profile, '__call__'):
                 for l in self.layers:
                     l.profile = profile
-            elif np.shape(profile)[0] == 2:
-                #prof_int = interp1d(profile[0], profile[1], bounds_error=False,
-                #                    fill_value=(profile[1][0], profile[1][-1]))
-                xprofile = np.asarray(profile[0], dtype=float)
-                fprofile = np.asarray(profile[1], dtype=float)
+            #elif np.shape(profile)[0] == 2:
+            elif np.isinstance(profile, (list, tuple)) and len(profile) == 2:
+                prof_int = interp1d(profile[0], profile[1], axis=0, 
+                                    bounds_error=False,
+                                    fill_value=(profile[1][0], profile[1][-1]))
 
                 if self.n_layers == 1:
-                    #self.layers[0].profile = prof_int
-                    self.layers[0].profile = lambda z: np.interp(z, xprofile, fprofile)
+                    self.layers[0].profile = prof_int
                 else:
                     z0 = 0
                     for l in self.layers:
-                        #l.profile = interp1d(profile[0]-z0, profile[1],
-                        #            bounds_error=False,
-                        #            fill_value=(profile[1][0], profile[1][-1]))
-                        l.profile = lambda z: np.interp(z, xprofile - z0, fprofile)
+                        l.profile = interp1d(profile[0]-z0, profile[1], axis=0,
+                                   bounds_error=False,
+                                   fill_value=(profile[1][0], profile[1][-1]))
                         z0 += l.depth
             else:
                 raise ValueError('Unrecogniazed type or format for `profile`')
@@ -277,12 +273,12 @@ class Surface(object):
         emi_ang: number or astropy Quantity, emission angle.  If not Quantity,
             then angle is in degrees
         wavelength: wavelength to calculate, same unit as the length quantities
-            in `Surface.layers` class objects
+            in `vectorSurface.layers` class objects
         epsrel: optional, relative error to tolerance in numerical
             integration.  See `scipy.integrate.quad`.
         """
-        if hasattr(emi_ang,'__iter__'):
-            raise ValueError('`emi_ang` has to be a scaler')
+        # if hasattr(emi_ang,'__iter__'):
+        #     raise ValueError('`emi_ang` has to be a scaler')
         self._check_layer_depth()
         self._check_layer_profile()
 
@@ -291,12 +287,18 @@ class Surface(object):
             np.shape(self.layers[0].n),
             np.shape(self.layers[0].loss_tangent)
         ) #(K, T)
-        L = np.zeros(param_shape) # total path length of light in the unit of absorption length
-        m = np.zeros(param_shape) # integrated quantity
-        trans_coef = np.ones(param_shape) # transmission coefficient = 1 - ref_coef
-        n0 = 1.0 # adjacent media outside of the layer to be calculated
-        emi_ang_layer = emi_ang #emission angle updated per layer
 
+        emi_ang_vector = np.atleast_1d(emi_ang)
+        nPixels = len(emi_ang_vector)
+        if emi_ang_vector.ndim == 1:
+            emi_ang_layer = emi_ang_vector[np.newaxis,  np.newaxis, :]
+
+        L = np.zeros((*param_shape, nPixels)) # total path length of light in the unit of absorption length
+        m = np.zeros((*param_shape, nPixels)) # integrated quantity
+        trans_coef = np.ones((*param_shape, nPixels)) # transmission coefficient = 1 - ref_coef
+        n0 = 1.0 # adjacent media outside of the layer to be calculated
+
+        
         npoints = 30
         x_gauss, w_gauss = leggauss(npoints)
         zNorm = 0.5 * (x_gauss + 1)
@@ -306,50 +308,55 @@ class Surface(object):
             prof = {'t': [], 'intprofile': [], 'zzz': [], 'L0': []}
         for i,l in enumerate(self.layers):
             # integrate in layer `l`
-            snell = Snell(l.n, n0)      
+            nExp = l.n[..., np.newaxis]
+            n0_Exp = n0 if isinstance(n0, float) else n0[..., np.newaxis]
+            snell = Snell(nExp, n0_Exp)      
             inc = snell.angle1(emi_ang_layer)
             ref_coef = snell.reflectance_coefficient(angle2=emi_ang_layer)
             coef = l.absorption_coefficient(wavelength)
             cos_i = np.cos(np.deg2rad(inc))
             dd = -2.3026*np.log10(epsrel)/coef
-            ddLayer = np.where(l.depth > dd, dd, l.depth)
+            ddvectorLayer = np.where(l.depth > dd, dd, l.depth)
             #zNorm = np.linspace(0, 1, 1000)
-            zzLayer = ddLayer[..., np.newaxis] * zNorm
+            zzLayer = ddvectorLayer[..., np.newaxis] * zNorm
             # if l.depth > dd_s:
             #     zz = np.linspace(0, dd_s, 1000)
             # else:
             #     zz = np.linspace(0, l.depth, 1000)
 
-            profile_vals = l.profile(zzLayer)   #Shape (Z,)
+            raw_vals = l.profile(zzLayer)   #Shape (Z,)
+            profile_vals = np.moveaxis(raw_vals, -1, -2)
 
             #Broadcast for integration
             #coeff: (K, T) -> (K, T, 1)
             #cos_i: (K, T) -> (K, T, 1)
             #L: (K, T) -> (K, T, 1)
             #zz: (Z,) -> (1, 1, Z)
-            coefLayer = coef[..., np.newaxis] #(K, T, 1)
-            cos_i_Layer = cos_i[..., np.newaxis] #(K, T, 1)
-            L_Layer = L[..., np.newaxis] #(K, T, 1)
+            coefvectorLayer = coef[..., np.newaxis, np.newaxis] #(K, T, 1)
+            cos_i_vectorLayer = cos_i[..., np.newaxis] #(K, T, 1)
+            L_vectorLayer = L[..., np.newaxis] #(K, T, 1)
+            zzvectorLayer = zzLayer[:, :, np.newaxis, :]
             #zz_b = zz[np.newaxis, np.newaxis, :] #(1, 1, Z)
             intfunc_vals = (profile_vals #(1, 1, Z)
-                            * np.exp(-coefLayer * zzLayer / cos_i_Layer - L_Layer)) #(K, T, Z)
+                            * np.exp(-coefvectorLayer * zzvectorLayer / cos_i_vectorLayer - L_vectorLayer)) #(K, T, Z)
             
             if debug:
-                prof['t'].append(l.profile(zzLayer))
+                prof['t'].append(l.profile(zzvectorLayer))
                 prof['intprofile'].append(intfunc_vals)
-                prof['zzz'].append(zzLayer+D)
+                prof['zzz'].append(zzvectorLayer+D)
                 prof['L0'].append(L)
                 D += l.depth
                 
             #Integrate over depth axis
-            #dzLayer = zzLayer[..., 1:] - zzLayer[..., :-1] #(Z-1,)
-            #integral = (intfunc_vals[..., :-1] * dzLayer).sum(axis=-1) #(K, T)
-            bweights = wNorm[np.newaxis, np.newaxis, :]
-            integral = (intfunc_vals * bweights).sum(axis=-1) * ddLayer
+            #dzvectorLayer = zzvectorLayer[..., 1:] - zzvectorLayer[..., :-1] #(Z-1,)
+            #integral = (intfunc_vals[..., :-1] * dzvectorLayer).sum(axis=-1) #(K, T)
+            ddb = ddvectorLayer[..., np.newaxis]
+            integral = (intfunc_vals * wNorm).sum(axis=-1) * ddb
             trans_coef *= (1-ref_coef)
-            m += trans_coef*coef*integral/cos_i
+            coeffVector = coef[..., np.newaxis]
+            m += trans_coef*coeffVector*integral/cos_i
             # prepare for the next layer
-            L += l.depth/cos_i*coef
+            L += l.depth/cos_i*coeffVector
             emi_ang_layer = inc
             n0 = l.n
             if debug:

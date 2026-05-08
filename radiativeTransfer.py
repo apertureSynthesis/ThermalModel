@@ -2,6 +2,7 @@ import os,sys
 sys.path.append(os.environ['HOME']+'/scripts')
 
 from ThermalModel.utils.core import Layer, Surface
+from ThermalModel.utils.vectorCore import vectorLayer, vectorSurface
 from ThermalModel.utils.helpers import getPars
 
 import numpy as np
@@ -135,7 +136,21 @@ class radiativeTransfer(object):
                     #Create grid of nn and loss_tan
                     nn_grid, lt_grid = np.meshgrid(nn, loss_tan, indexing='ij') #(K, T)
 
-                    if self.pars['doParallel']:
+                    if self.pars['doVectorize']:
+                        if not self.pars['suppressMessages']:
+                            print('Vectorizing the shape model (high RAM intensity)')
+
+                        intValid = intensity[:, validI, validJ] #(Z, validPixels)
+                        emiValid = emi[validI, validJ] #(validPixels)
+
+                        #Initialize one vectorLayer and vectorSurface
+                        layer = vectorLayer(n=nn_grid, loss_tangent=lt_grid,
+                                            profile=[zz, intValid])
+                        surface = vectorSurface(layer)
+
+                        images[..., validI, validJ] = surface.emission(emiValid, freqM)
+
+                    elif self.pars['doParallel']:
                         if not self.pars['suppressMessages']:
                             print('Performing parallel calculations')
                         imageP = Parallel(n_jobs=-1, batch_size='auto')(
