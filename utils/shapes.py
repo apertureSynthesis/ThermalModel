@@ -4,9 +4,10 @@ from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import interp1d, RegularGridInterpolator
 from scipy.ndimage import map_coordinates
 
-def readObjPlate(fileName):
+def readShape(fileName):
     """
-    Reads coordinates of vertices and triangle facets from a .obj shape file.
+    Reads coordinates of vertices and triangle facets from a shape file.
+    Accepted formats are .obj, .plt, and .txt
     
     Parameters: 
         fileName (string): Name of the shape file
@@ -15,93 +16,70 @@ def readObjPlate(fileName):
         tuple: (vertices, triangles)
             - vertices: Shape (3, N) array of Cartesian coordinates.
             - triangles: Shape (3, M) array of vertex indices.
-    """
-
-    #Check that we are dealing with a .obj file
-    if not fileName.lower().endswith('.obj'):
-        raise ValueError('Input file must be .obj format')
+    """   
     nVert = 0
     nTrian = 0
     i=0
     j=0
 
-    with open(fileName, 'r') as fn:
-        for line in fn:
-            if line.rstrip().split()[0] == 'v':
-                nVert += 1
-            else:
-                nTrian += 1
+    #Get the file extension and proceed accordingly
+    if fileName.lower().endswith('.obj'):
+        with open(fileName, 'r') as fn:
+            for line in fn:
+                if line.rstrip().split()[0] == 'v':
+                    nVert += 1
+                else:
+                    nTrian += 1
 
-        vertices = np.zeros((3, nVert))
-        triangles = np.zeros((3, nTrian)) 
+            vertices = np.zeros((3, nVert))
+            triangles = np.zeros((3, nTrian)) 
 
-    with open(fileName, 'r') as fn:
-        for line in fn:
-            fline = line.rstrip().split()
-            if fline[0] == 'v':
-                vertices[0, i] = np.float64(fline[1])
-                vertices[1, i] = np.float64(fline[2])
-                vertices[2, i] = np.float64(fline[3])
-                i+=1
-            else:
-                triangles[0, j] = int(fline[1])-1
-                triangles[1, j] = int(fline[2])-1
-                triangles[2, j] = int(fline[3])-1
-                
-                j+=1   
-     
-
-    return vertices, triangles.astype(int)  
-                  
-
-def readPlate(fileName):
-    """
-    Reads coordinates of vertices and triangle facets from a .plt shape file.
-    
-    Parameters: 
-        fileName (string): Name of the shape file
-
-    Returns:
-        tuple: (vertices, triangles)
-            - vertices: Shape (3, N) array of Cartesian coordinates.
-            - triangles: Shape (3, M) array of vertex indices.
-    """
-    nVert = 0.
-    nTrian = 0.
-
-    #Check that we are dealing with a .plt file
-    if not fileName.lower().endswith('.plt'):
-        raise ValueError('Input file must be .plt format')
-
-    with open(fileName, 'r') as fn:
-        for line in fn:
-            if len(line.split()) == 2:
-                nVert = int(line.split()[0])
-                nTrian = int(line.split()[1])
-                break
-    
-        vertices = np.zeros((3, nVert))
-        triangles = np.zeros((3, nTrian))
-    
-        i=0
-        j=0
-        for line in fn:
-            if line.rstrip().endswith(']'):
-                x,y,z1 = line.rstrip().split()
-                z = z1.split(']')[0]
-                vertices[0, i] = np.float64(x)
-                vertices[1, i] = np.float64(y)
-                vertices[2, i] = np.float64(z)
-
-                i+=1
-            else:
-                x,y,z = line.rstrip().split()
-                triangles[0, j] = int(x)-1
-                triangles[1, j] = int(y)-1
-                triangles[2, j] = int(z)-1
-                
-                j+=1              
+        with open(fileName, 'r') as fn:
+            for line in fn:
+                fline = line.rstrip().split()
+                if fline[0] == 'v':
+                    vertices[0, i] = np.float64(fline[1])
+                    vertices[1, i] = np.float64(fline[2])
+                    vertices[2, i] = np.float64(fline[3])
+                    i+=1
+                else:
+                    triangles[0, j] = int(fline[1])-1
+                    triangles[1, j] = int(fline[2])-1
+                    triangles[2, j] = int(fline[3])-1
+                    
+                    j+=1  
+    elif (fileName.lower.endswith('.plt')) or (fileName.lower.endswith('.txt')):
+        with open(fileName, 'r') as fn:
+            for line in fn:
+                if len(line.split()) == 2:
+                    nVert = int(line.split()[0])
+                    nTrian = int(line.split()[1])
+                    break
         
+            vertices = np.zeros((3, nVert))
+            triangles = np.zeros((3, nTrian))
+        
+            i=0
+            j=0
+            for line in fn:
+                if line.rstrip().endswith(']'):
+                    x,y,z1 = line.rstrip().split()
+                    z = z1.split(']')[0]
+                    vertices[0, i] = np.float64(x)
+                    vertices[1, i] = np.float64(y)
+                    vertices[2, i] = np.float64(z)
+
+                    i+=1
+                else:
+                    x,y,z = line.rstrip().split()
+                    triangles[0, j] = int(x)-1
+                    triangles[1, j] = int(y)-1
+                    triangles[2, j] = int(z)-1
+                    
+                    j+=1 
+    else:
+        raise ValueError('Input file must be .obj, .plt, or .txt format')
+    
     return vertices, triangles.astype(int)
 
 def polyConvert(shape0, xs, ys):

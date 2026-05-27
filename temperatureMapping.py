@@ -2,7 +2,7 @@ import os,sys
 sys.path.append(os.environ['HOME']+'/scripts')
 
 from ThermalModel.utils.helpers import getPars
-from ThermalModel.utils.shapes import readPlate, meshEllipsoid, meshNormal, vectMatchView, rd2xyz, meshGeoMap, tpmSph2Plt, tpmMapping, readObjPlate
+from ThermalModel.utils.shapes import readShape, meshEllipsoid, meshNormal, vectMatchView, rd2xyz, meshGeoMap, tpmSph2Plt, tpmMapping
 
 from glob import glob
 
@@ -42,14 +42,8 @@ class temperatureMapping(object):
             if self.pars['shapeFile'] != 'None':
                 print('Using a shape model: any ellipsoid will be ignored.')
 
-                #Detect whether we have a .obj or .plt file
-                if self.pars['shapeFile'].lower().endswith('.plt'):
-                    vertices, triangles = readPlate(self.pars['shapeFile'])
-                elif self.pars['shapeFile'].lower().endswith('.obj'):
-                    vertices, triangles = readObjPlate(self.pars['shapeFile'])
-                else:
-                    raise ValueError('Shape file must have .obj or .plt extension.')
-
+                #Read in the shape model according to the extension. .obj, .plt, or .txt are acceptable
+                vertices, triangles = readShape(self.pars['shapeFile'])
 
             elif (self.pars['shapeFile'] == 'None') & (self.pars['shape_a'] != 'None'):
                 print('Using an ellipsoid')
