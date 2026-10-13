@@ -165,7 +165,7 @@ class vectorLayer(object):
         elif hasattr(profile, '__call__'):
             self.profile = profile
         #elif np.shape(profile)[0] == 2:
-        elif isinstance(profile, (list, type)) and len(profile) == 2:
+        elif isinstance(profile, (list, tuple, np.ndarray)) and len(profile) == 2:
             self.profile = interp1d(profile[0], profile[1], axis=0, 
                                     bounds_error=False,
                                     fill_value=(profile[1][0], profile[1][-1]))
@@ -232,7 +232,7 @@ class vectorSurface(object):
                 for l in self.layers:
                     l.profile = profile
             #elif np.shape(profile)[0] == 2:
-            elif np.isinstance(profile, (list, tuple)) and len(profile) == 2:
+            elif isinstance(profile, (list, tuple)) and len(profile) == 2:
                 prof_int = interp1d(profile[0], profile[1], axis=0, 
                                     bounds_error=False,
                                     fill_value=(profile[1][0], profile[1][-1]))
@@ -299,7 +299,7 @@ class vectorSurface(object):
         n0 = 1.0 # adjacent media outside of the layer to be calculated
 
         
-        npoints = 30
+        npoints = 100
         x_gauss, w_gauss = leggauss(npoints)
         zNorm = 0.5 * (x_gauss + 1)
         wNorm = 0.5 * w_gauss
@@ -313,9 +313,10 @@ class vectorSurface(object):
             snell = Snell(nExp, n0_Exp)      
             inc = snell.angle1(emi_ang_layer)
             ref_coef = snell.reflectance_coefficient(angle2=emi_ang_layer)
-            coef = l.absorption_coefficient(wavelength)
+            coef = np.maximum(l.absorption_coefficient(wavelength), 1e-15)
             cos_i = np.cos(np.deg2rad(inc))
-            dd = -2.3026*np.log10(epsrel)/coef
+            #dd = -2.3026*np.log10(epsrel)/coef
+            dd = -np.log(epsrel) / coef
             ddvectorLayer = np.where(l.depth > dd, dd, l.depth)
             #zNorm = np.linspace(0, 1, 1000)
             zzLayer = ddvectorLayer[..., np.newaxis] * zNorm
@@ -335,7 +336,8 @@ class vectorSurface(object):
             coefvectorLayer = coef[..., np.newaxis, np.newaxis] #(K, T, 1)
             cos_i_vectorLayer = cos_i[..., np.newaxis] #(K, T, 1)
             L_vectorLayer = L[..., np.newaxis] #(K, T, 1)
-            zzvectorLayer = zzLayer[:, :, np.newaxis, :]
+            #zzvectorLayer = zzLayer[:, :, np.newaxis, :]
+            zzvectorLayer = np.expand_dims(zzLayer, axis=-2)
             #zz_b = zz[np.newaxis, np.newaxis, :] #(1, 1, Z)
             intfunc_vals = (profile_vals #(1, 1, Z)
                             * np.exp(-coefvectorLayer * zzvectorLayer / cos_i_vectorLayer - L_vectorLayer)) #(K, T, Z)
@@ -354,7 +356,7 @@ class vectorSurface(object):
             integral = (intfunc_vals * wNorm).sum(axis=-1) * ddb
             trans_coef *= (1-ref_coef)
             coeffVector = coef[..., np.newaxis]
-            m += trans_coef*coeffVector*integral/cos_i
+            m += np.where(np.isnan(trans_coef*coeffVector*integral/cos_i), 0.0, trans_coef*coeffVector*integral/cos_i)
             # prepare for the next layer
             L += l.depth/cos_i*coeffVector
             emi_ang_layer = inc

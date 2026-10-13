@@ -128,7 +128,7 @@ class radiativeTransfer(object):
                         hdr = imFits[0].header
 
                     #Loop through the dielectric parameter space
-                    images = np.zeros(nn.shape + loss_tan.shape + intensity.shape[1:])
+                    images = np.zeros(nn.shape + loss_tan.shape + intensity.shape[1:]) + np.nan
                     validPix = intensity[0] > 0
                     validI, validJ = np.where(validPix)
                     freqM = u.Quantity(self.pars['freq']).to_value('m', u.spectral())
@@ -216,11 +216,11 @@ class radiativeTransfer(object):
                     if len(radFiles) > 1:
                         plotIm = axs[imInd].imshow(plotImage,origin='lower',cmap='viridis')
                         cbar = plt.colorbar(plotIm, ax=axs[imInd],fraction=0.046,pad=0.04,location='top')
-                        cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:.0f}')
+                        cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:5.1f}')
                     else:
                         plotIm = axs.imshow(plotImage,origin='lower',cmap='viridis')
                         cbar = plt.colorbar(plotIm, ax=axs,fraction=0.046,pad=0.04,location='top')
-                        cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:.0f}')      
+                        cbar.set_label(f'Brightness Temperature (K) for sub-Earth lon: {lon:5.1f}')      
                     imInd += 1                  
                 plt.tight_layout()
                 plt.savefig(outputDir+'/radiativeModel.pdf',dpi=300)

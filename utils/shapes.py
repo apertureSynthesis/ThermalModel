@@ -574,9 +574,9 @@ def meshGeoMap(vertices, triangles, sunPos, dRange,
     nVert = vertices.shape[1]
     nTriangle = triangles.shape[1]
 
-    iMap = np.zeros((xs, ys), dtype=float)
-    eMap = np.zeros((xs, ys), dtype=float)
-    aMap = np.zeros((xs, ys), dtype=float)
+    iMap = np.zeros((xs, ys), dtype=float) + np.nan
+    eMap = np.zeros((xs, ys), dtype=float) + np.nan
+    aMap = np.zeros((xs, ys), dtype=float) + np.nan
     mask = np.zeros((xs, ys), dtype=np.uint8)
     pltMap = np.full((xs, ys), -1, dtype=int)
 
@@ -1038,7 +1038,7 @@ def tpmMapping(tempList, pltMap, depth=None, zz=None, cubic=True, tss0 = None):
 
     #Map the temperature to the image
     xs, ys = pltMap.shape
-    img = np.zeros((xs, ys, nDepth), dtype=float)
+    img = np.zeros((xs, ys, nDepth), dtype=float) + np.nan
 
     #Mask out background pixels
     mask = pltMap >= 0

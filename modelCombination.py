@@ -88,7 +88,7 @@ class modelCombination(object):
             nRef = nLoss = None
 
             for gamma, emis, modelDir in records:
-                modelFiles = sorted(glob(os.path.join(self.pars['radiativePath'],modelDir, '*_rt_???.fits')))
+                modelFiles = sorted(glob(os.path.join(self.pars['radiativePath'],modelDir, '*_rt_*.fits')))
                 if not modelFiles:
                     raise RuntimeError(f"No FITS files matched in {modelDir}")
                 
@@ -134,7 +134,8 @@ class modelCombination(object):
                     #sum(I_nu [Jy/sr]) * dOmega[sr] -> [Jy]
                     #sum over x,y
                     #Shape nRef, nLoss
-                    flux = (image.sum(axis=-1).sum(axis=-1) * pxlSclOmegaSr).to(u.Jy)
+                    #flux = (image.sum(axis=-1).sum(axis=-1) * pxlSclOmegaSr).to(u.Jy)
+                    flux = (np.nansum(np.nansum(image, axis=-1), axis=-1) * pxlSclOmegaSr).to(u.Jy)
 
                     #Projected area = number of on-disk pixels * dOmega; on-disk is >0
                     onDisk = image[0, 0] > 0

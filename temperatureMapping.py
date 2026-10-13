@@ -114,7 +114,7 @@ class temperatureMapping(object):
                                                                 xs = int(self.pars['xSize']), ys=int(self.pars['ySize']), noShadow=True)
 
                     #Save the plate map and plate files
-                    suffix = '_' + f"{np.round(subeLon[i]):03d}.fits"
+                    suffix = '_' + f"{subeLon[i]:05.1f}.fits"
                     outFile = tOutDir + '/platemap' + suffix
 
                     hdu0 = fits.PrimaryHDU(pltMap)

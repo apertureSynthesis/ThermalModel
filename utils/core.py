@@ -297,7 +297,7 @@ class Surface(object):
         n0 = 1.0 # adjacent media outside of the layer to be calculated
         emi_ang_layer = emi_ang #emission angle updated per layer
 
-        npoints = 30
+        npoints = 100
         x_gauss, w_gauss = leggauss(npoints)
         zNorm = 0.5 * (x_gauss + 1)
         wNorm = 0.5 * w_gauss
@@ -311,7 +311,8 @@ class Surface(object):
             ref_coef = snell.reflectance_coefficient(angle2=emi_ang_layer)
             coef = l.absorption_coefficient(wavelength)
             cos_i = np.cos(np.deg2rad(inc))
-            dd = -2.3026*np.log10(epsrel)/coef
+            #dd = -2.3026*np.log10(epsrel)/coef
+            dd = -np.log(epsrel) / coef
             ddLayer = np.where(l.depth > dd, dd, l.depth)
             #zNorm = np.linspace(0, 1, 1000)
             zzLayer = ddLayer[..., np.newaxis] * zNorm
