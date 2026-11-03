@@ -695,7 +695,7 @@ def meshGeoMap(vertices, triangles, sunPos, dRange,
                 eMap[nZ, mZ] = emi[j]
                 aMap[nZ, mZ] = alpha[j]
                 pltMap[nZ, mZ] = j
-                mask[nZ, mZ] = 1 if inc[j] > 9 else 3
+                mask[nZ, mZ] = 1 if inc[j] > 90 else 3
 
         # for m in mRange:
         #     for n in nRange:
@@ -936,9 +936,13 @@ def tpmSph2Plt(vertices, triangles, tref, soLon, times=None, lats=None, retrogra
 
 
     #Calculate local time for all plates
-    localTime = subsLon - lonLat[:, 0]
+    #localTime = subsLon - lonLat[:, 0]
+    #prograde: East is afternoon
+    #retrograde: East is morning
     if retrograde:
-        localTime = -localTime
+        localTime = subsLon - lonLat[:, 0]
+    else:
+        localTime = lonLat[:, 0] - subsLon
     localTime = (localTime + 360) % 360
 
     #Local latitude for all plates

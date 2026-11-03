@@ -20,7 +20,8 @@ from joblib import Parallel, delayed
 def processPixel(i, j, zz, intensity, emi, nn_grid, lt_grid, freq):
     layer = Layer(n=nn_grid, loss_tangent=lt_grid, profile=[zz, intensity])
     surface = Surface(layer)
-    image = surface.emission(emi, freq)
+    #thetaE = np.cos(np.deg2rad(emi))
+    image = surface.emission(emi, freq) #* thetaE
     return i, j, image
 
 class radiativeTransfer(object):
@@ -138,7 +139,7 @@ class radiativeTransfer(object):
 
                     if self.pars['doVectorize']:
                         if not self.pars['suppressMessages']:
-                            print('Vectorizing the shape model (high RAM intensity)')
+                            print('Vectorizing the shape model')
 
                         intValid = intensity[:, validI, validJ] #(Z, validPixels)
                         emiValid = emi[validI, validJ] #(validPixels)
@@ -148,7 +149,8 @@ class radiativeTransfer(object):
                                             profile=[zz, intValid])
                         surface = vectorSurface(layer)
 
-                        images[..., validI, validJ] = surface.emission(emiValid, freqM)
+                        #thetaE = np.cos(np.deg2rad(emiValid))
+                        images[..., validI, validJ] = surface.emission(emiValid, freqM) #* thetaE
 
                     elif self.pars['doParallel']:
                         if not self.pars['suppressMessages']:
@@ -173,7 +175,8 @@ class radiativeTransfer(object):
                             layer = Layer(n=nn_grid, loss_tangent=lt_grid,
                                             profile=[zz, intensity[:, i, j]])
                             surface = Surface(layer)
-                            images[..., i, j] = surface.emission(emi[i, j], freqM)
+                            #thetaE = np.cos(np.deg2rad(emi[i, j]))
+                            images[..., i, j] = surface.emission(emi[i, j], freqM) #* thetaE
 
                     #Save the simulated images
                     tmp = os.path.basename(imFile).split('_')

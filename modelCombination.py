@@ -259,10 +259,10 @@ class modelCombination(object):
             #Plot a lightcurve with fixed e, n, and loss tangent, with varying TI
             fig, ax = plt.subplots(figsize=(7,5))
             for i in range(len(gamma)):
-                ax.plot(lonVals, flux[i, 2, :, 2, -2], 'o')
-            plt.text(0.8, 0.1, f"$\\epsilon$ = {emis[2]:.2f}", transform=ax.transAxes)
-            plt.text(0.8, 0.06, f"n = {refIdx[2]:.2f}", transform=ax.transAxes)
-            plt.text(0.8, 0.02, f"$\\tan\\Delta$ = {loss[-2]:.2f}", transform=ax.transAxes)
+                ax.plot(lonVals, flux[i, 0, :, 0, -0], 'o')
+            plt.text(0.8, 0.1, f"$\\epsilon$ = {emis[0]:.2f}", transform=ax.transAxes)
+            plt.text(0.8, 0.06, f"n = {refIdx[0]:.2f}", transform=ax.transAxes)
+            plt.text(0.8, 0.02, f"$\\tan\\Delta$ = {loss[0]:.2f}", transform=ax.transAxes)
             ax.set_xlabel('Longitude (deg)')
             ax.set_ylabel('Flux (Jy)')
             plt.legend(gamma)

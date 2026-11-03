@@ -58,6 +58,7 @@ class temperatureMapping(object):
 
             #Location of the recast KRC models
             tFiles = glob(self.pars['reCastPath']+'/*tref_gamma*_emis*.fits')
+            
 
             #FITS keys to propogate to output
             keys = ['ti', 'emiss', 'rho', 'c', 'p_orb', 'p_rot', 'a_skin', 'd_skin']
@@ -71,6 +72,9 @@ class temperatureMapping(object):
             rH = np.zeros(nLon) + u.Quantity(self.pars['rH'])
             delta = np.zeros(nLon) + u.Quantity(self.pars['delta'])
             pxlScl = u.Quantity(self.pars['pxlScale'])
+
+            #Check whether retrograde rotator. These have pole ecliptic latidudes < 0 in DAMIT
+            retrograde = True if (np.float64(self.pars['eclipticLatitude']) < 0) else False
 
             #Iterate through each model
             for tFile in tFiles:
@@ -90,6 +94,16 @@ class temperatureMapping(object):
                     lathdr= tf['lat'].header
                 #Reshape tref to match IDL expectation
                 tref = np.transpose(tref, axes=[2,1,0])
+                
+
+                #Sort the hourAngle and latitudes and tRef so np.interp works correctly
+                #with increasing angle
+                sortHours = np.argsort(hourAngle)
+                hourAngleSort = hourAngle[sortHours]
+                sortLats = np.argsort(lat)
+                latSort = lat[sortLats]
+                trefSort = tref[:, :, sortLats]
+                trefSort = trefSort[sortHours, :, :]
 
                 #Prepare output directory
                 outStem = tFile.split('/')[-1][:-5]
@@ -130,7 +144,8 @@ class temperatureMapping(object):
                         print(f"Wrote {outFile}\n-----------------\n")
 
                     #Calculate TPM for plate shape model
-                    tempList = tpmSph2Plt(vertices, triangles, tref, subsLon[i], times = np.append(hourAngle,360), lats=lat)
+                    tempList = tpmSph2Plt(vertices, triangles, trefSort, subsLon[i], times = np.append(hourAngleSort,360), 
+                                          lats=latSort, retrograde = retrograde)
 
                     #Temperature image
                     tempMap = tpmMapping(tempList, pltMap, depth=depth, zz=depth)
