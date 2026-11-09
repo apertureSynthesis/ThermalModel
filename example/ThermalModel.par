@@ -1,4 +1,4 @@
-###As of 04/01/26, NXR###
+###As of 11/09/26, NXR###
 ####################################
 ## Global parameters ###############
 ####################################
@@ -13,7 +13,7 @@ suppressMessages = True
 object = "Ganymed"
 rotational_period = "10.31284 hour"
 orbital_period = "4.35 year"
-rho = "11190 kg/m3"
+rho = "1190 kg/m3"
 cs = "750 J/(K kg)"
 
 ##Input files
@@ -41,6 +41,10 @@ shape_c = 0.310
 #Step size for latitude and longitude
 lat_step = 36
 lon_step = 72
+
+##Pole orientation
+eclipticLongitude = 195
+eclipticLatitude = -79
 
 
 ##Observing parameters
